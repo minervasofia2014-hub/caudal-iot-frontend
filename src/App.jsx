@@ -16,7 +16,11 @@ const TEXTOS_ESTADO = {
 
 function formatearFecha(valor) {
     if (!valor) return 'Sin dato'
-    return new Intl.DateTimeFormat('es-CO', { dateStyle: 'short', timeStyle: 'medium' }).format(new Date(valor))
+    const fecha = new Date(valor)
+    // Si la fecha no es válida (por ejemplo "Sin hora" del ESP32 antes de
+    // sincronizar el reloj), no reventar: devolvemos un texto seguro.
+    if (isNaN(fecha.getTime())) return 'Sin dato'
+    return new Intl.DateTimeFormat('es-CO', { dateStyle: 'short', timeStyle: 'medium' }).format(fecha)
 }
 
 function valorNumerico(valor) {
