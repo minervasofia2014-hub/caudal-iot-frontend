@@ -50,29 +50,46 @@ function GraficaLinea({ data, color = '#176b87', label }) {
     )
 }
 
-function BarraBalance({ entrada, salida1, salida2 }) {
-    const totalSalida = salida1 + salida2
-    const perdida = Math.max(0, entrada - totalSalida)
-    const hayFuga = perdida > 50
-    const eficiencia = entrada > 0 ? Math.min(100, (totalSalida / entrada) * 100).toFixed(1) : 100
+function BarraBalance({ entrada, salida1, salida2, balance }) {
+    // Si el backend ya manda el balance por ventana (volumen real acumulado), lo usamos.
+    // Si no (backend viejo), caemos al caudal instantáneo como respaldo.
+    const usaVentana = balance && balance.entrada_prom != null
+    const ent = usaVentana ? valorNumerico(balance.entrada_prom) : valorNumerico(entrada)
+    const sal1 = usaVentana ? valorNumerico(balance.salida1_prom) : valorNumerico(salida1)
+    const sal2 = usaVentana ? valorNumerico(balance.salida2_prom) : valorNumerico(salida2)
+
+    const totalSalida = sal1 + sal2
+    const perdida = Math.max(0, ent - totalSalida)
+
+    // Umbral de fuga más realista: la pérdida debe ser significativa en PORCENTAJE
+    // (>15% de la entrada) y además superar un piso absoluto, para no marcar fuga por
+    // el ruido normal de sensores que trabajan cerca de su límite inferior.
+    const TOLERANCIA_PCT = 0.15
+    const PISO_MLMIN = 40
+    const hayFuga = ent > 0 && perdida > ent * TOLERANCIA_PCT && perdida > PISO_MLMIN
+
+    const eficiencia = ent > 0 ? Math.min(100, (totalSalida / ent) * 100).toFixed(1) : 100
+    const desc = usaVentana
+        ? `Promedio de los últimos ${balance.ventana_min} min · calculado con el volumen real (total_mL) de cada sensor`
+        : 'Comparación entre el agua que salió del tanque y la que llegó a los ramales'
     return (
         <div className="balance-section">
             <h2 className="balance-title">Balance Hídrico</h2>
-            <p className="balance-desc">Comparación entre el agua que salió del tanque y la que llegó a los ramales</p>
+            <p className="balance-desc">{desc}</p>
             <div className="balance-formula">
-                <div className="balance-box entrada"><span className="balance-icon">💧</span><strong>{valorNumerico(entrada).toFixed(1)}</strong><small>mL/min entrada<br />(Sensor 1 · Bocatoma)</small></div>
+                <div className="balance-box entrada"><span className="balance-icon">💧</span><strong>{ent.toFixed(1)}</strong><small>mL/min entrada<br />(Sensor 1 · Bocatoma)</small></div>
                 <div className="balance-equals">=</div>
-                <div className="balance-box salida"><span className="balance-icon">🔵</span><strong>{valorNumerico(salida1).toFixed(1)}</strong><small>mL/min<br />(Sensor 2 · Ramal 1)</small></div>
+                <div className="balance-box salida"><span className="balance-icon">🔵</span><strong>{sal1.toFixed(1)}</strong><small>mL/min<br />(Sensor 2 · Ramal 1)</small></div>
                 <div className="balance-plus">+</div>
-                <div className="balance-box salida"><span className="balance-icon">🔵</span><strong>{valorNumerico(salida2).toFixed(1)}</strong><small>mL/min<br />(Sensor 3 · Ramal 2)</small></div>
+                <div className="balance-box salida"><span className="balance-icon">🔵</span><strong>{sal2.toFixed(1)}</strong><small>mL/min<br />(Sensor 3 · Ramal 2)</small></div>
                 {hayFuga && (<><div className="balance-plus">+</div><div className="balance-box fuga"><span className="balance-icon">⚠️</span><strong>{perdida.toFixed(1)}</strong><small>mL/min<br />Pérdida detectada</small></div></>)}
             </div>
             <div className="balance-bar-wrap">
                 <div className="balance-bar">
-                    {entrada > 0 && (<>
-                        <div className="balance-bar-seg ramal1" style={{ width: `${(salida1 / entrada) * 100}%` }} title={`Ramal 1: ${salida1.toFixed(1)} mL/min`} />
-                        <div className="balance-bar-seg ramal2" style={{ width: `${(salida2 / entrada) * 100}%` }} title={`Ramal 2: ${salida2.toFixed(1)} mL/min`} />
-                        {hayFuga && <div className="balance-bar-seg perdida" style={{ width: `${(perdida / entrada) * 100}%` }} title={`Pérdida: ${perdida.toFixed(1)} mL/min`} />}
+                    {ent > 0 && (<>
+                        <div className="balance-bar-seg ramal1" style={{ width: `${Math.min(100, (sal1 / ent) * 100)}%` }} title={`Ramal 1: ${sal1.toFixed(1)} mL/min`} />
+                        <div className="balance-bar-seg ramal2" style={{ width: `${Math.min(100, (sal2 / ent) * 100)}%` }} title={`Ramal 2: ${sal2.toFixed(1)} mL/min`} />
+                        {hayFuga && <div className="balance-bar-seg perdida" style={{ width: `${Math.min(100, (perdida / ent) * 100)}%` }} title={`Pérdida: ${perdida.toFixed(1)} mL/min`} />}
                     </>)}
                 </div>
                 <div className="balance-bar-legend">
@@ -82,7 +99,7 @@ function BarraBalance({ entrada, salida1, salida2 }) {
                 </div>
             </div>
             <div className={`balance-status ${hayFuga ? 'fuga' : 'ok'}`}>
-                {hayFuga ? `⚠️ Fuga detectada — Eficiencia: ${eficiencia}% — Pérdida: ${perdida.toFixed(1)} mL/min` : `✅ Sistema balanceado — Eficiencia: ${eficiencia}%`}
+                {hayFuga ? `⚠️ Posible fuga — Eficiencia: ${eficiencia}% — Pérdida: ${perdida.toFixed(1)} mL/min` : `✅ Sistema balanceado — Eficiencia: ${eficiencia}%`}
             </div>
         </div>
     )
@@ -123,6 +140,7 @@ function PanelUsuarios({ api, cabeceras }) {
     const [cargando, setCargando] = useState(true)
     const [error, setError] = useState('')
     const [ocupado, setOcupado] = useState(null)
+    const [coords, setCoords] = useState({}) // edición de lat/lng por usuario
 
     async function cargarUsuarios() {
         try { const { data } = await api.get('/api/usuarios', { headers: cabeceras }); setUsuarios(data); setError('') }
@@ -130,6 +148,27 @@ function PanelUsuarios({ api, cabeceras }) {
         finally { setCargando(false) }
     }
     useEffect(() => { cargarUsuarios() }, [])
+
+    // valor mostrado en cada casilla: lo que el admin está escribiendo, o lo guardado
+    const valorCoord = (u, campo) => {
+        if (coords[u._id]?.[campo] !== undefined) return coords[u._id][campo]
+        const v = campo === 'lat' ? u.latitud : u.longitud
+        return v === null || v === undefined ? '' : v
+    }
+    const editarCoord = (id, campo, valor) => {
+        setCoords((c) => ({ ...c, [id]: { ...c[id], [campo]: valor } }))
+    }
+    async function guardarCoords(u) {
+        setOcupado(u._id)
+        try {
+            const latitud = valorCoord(u, 'lat')
+            const longitud = valorCoord(u, 'lng')
+            await api.put(`/api/usuarios/${u._id}`, { ...u, latitud, longitud }, { headers: cabeceras })
+            setCoords((c) => { const n = { ...c }; delete n[u._id]; return n })
+            await cargarUsuarios()
+        } catch { alert('No fue posible guardar las coordenadas') }
+        finally { setOcupado(null) }
+    }
 
     async function aprobar(id) {
         setOcupado(id)
@@ -158,7 +197,7 @@ function PanelUsuarios({ api, cabeceras }) {
             {error && <div className="alert-banner">{error}</div>}
             <div className="table-wrap">
                 <table>
-                    <thead><tr><th>Usuario</th><th>Nombre</th><th>Correo</th><th>Estado</th><th>Rol</th><th>Acciones</th></tr></thead>
+                    <thead><tr><th>Usuario</th><th>Nombre</th><th>Correo</th><th>Estado</th><th>Rol</th><th>Ubicación (lat, lng)</th><th>Acciones</th></tr></thead>
                     <tbody>
                         {usuarios.map((u) => (
                             <tr key={u._id}>
@@ -168,13 +207,18 @@ function PanelUsuarios({ api, cabeceras }) {
                                 <td><span className={`table-status ${u.esta_activo ? 'status-normal' : 'status-desconectado'}`}>{u.esta_activo ? 'Aprobado' : 'Pendiente'}</span></td>
                                 <td>{u.es_administrador ? '👑 Admin' : 'Usuario'}</td>
                                 <td className="admin-actions">
+                                    <input type="number" step="any" placeholder="lat" value={valorCoord(u, 'lat')} onChange={(e) => editarCoord(u._id, 'lat', e.target.value)} style={{ width: 90 }} />
+                                    <input type="number" step="any" placeholder="lng" value={valorCoord(u, 'lng')} onChange={(e) => editarCoord(u._id, 'lng', e.target.value)} style={{ width: 90 }} />
+                                    <button className="btn-mini" disabled={ocupado === u._id} onClick={() => guardarCoords(u)} type="button">📍 Guardar</button>
+                                </td>
+                                <td className="admin-actions">
                                     {!u.esta_activo && <button className="btn-mini btn-mini-aprobar" disabled={ocupado === u._id} onClick={() => aprobar(u._id)} type="button">Aprobar</button>}
                                     <button className="btn-mini" disabled={ocupado === u._id} onClick={() => cambiarRol(u)} type="button">{u.es_administrador ? 'Quitar admin' : 'Hacer admin'}</button>
                                     <button className="btn-mini btn-mini-eliminar" disabled={ocupado === u._id} onClick={() => eliminar(u._id)} type="button">Eliminar</button>
                                 </td>
                             </tr>
                         ))}
-                        {usuarios.length === 0 && <tr><td colSpan="6" style={{ textAlign: 'center', color: '#aaa' }}>Sin usuarios</td></tr>}
+                        {usuarios.length === 0 && <tr><td colSpan="7" style={{ textAlign: 'center', color: '#aaa' }}>Sin usuarios</td></tr>}
                     </tbody>
                 </table>
             </div>
@@ -310,6 +354,14 @@ function App() {
         catch { alert('❌ Error al enviar comando') }
     }
 
+    async function reiniciarSistema() {
+        if (!window.confirm('¿Reiniciar los contadores de los 3 sensores a 0?\nSe borrará el historial de mediciones. Esta acción no se puede deshacer.')) return
+        try {
+            await api.post('/api/v1/reiniciar/', null, { headers: cabeceras })
+            setDashboard(null); setError('')
+        } catch { alert('No fue posible reiniciar el sistema.') }
+    }
+
     if (verificandoSesion) {
         return (<main className="auth-page"><section className="auth-panel"><p className="eyebrow">Acueducto veredal</p><h1>Validando acceso</h1><p>Comprobando tu sesión...</p></section></main>)
     }
@@ -392,6 +444,9 @@ function App() {
                 <div className="header-actions">
                     <div className={`status-pill status-${estado}`}><span />{TEXTOS_ESTADO[estado] || estado}</div>
                     <span className="user-badge">{usuarioActual.es_administrador ? '👑 Admin' : '👤 ' + usuarioActual.usuario}</span>
+                    {usuarioActual.es_administrador && (
+                        <button className="logout-button" onClick={reiniciarSistema} type="button" style={{ background: '#c0392b', color: '#fff', borderColor: '#c0392b' }}>Reiniciar</button>
+                    )}
                     <button className="logout-button" onClick={() => setMostrarCambiarClave(!mostrarCambiarClave)} type="button">🔑</button>
                     <button className="logout-button" onClick={cerrarSesion} type="button">Salir</button>
                 </div>
@@ -434,10 +489,10 @@ function App() {
                     </section>
 
                     <section className="balance-wrap">
-                        <BarraBalance entrada={entrada} salida1={salida1} salida2={salida2} />
+                        <BarraBalance entrada={entrada} salida1={salida1} salida2={salida2} balance={dashboard?.balance} />
                     </section>
 
-                    <MapaUbicacion />
+                    <MapaUbicacion api={api} cabeceras={cabeceras} />
 
                     <section className="valvulas-section">
                         <h2 className="section-title">Control de electroválvulas</h2>

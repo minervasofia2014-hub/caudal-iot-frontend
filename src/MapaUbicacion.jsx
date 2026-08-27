@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 
 //puntos de ejemplo cerca de bucaramanga (floridablanca), simulando donde
@@ -9,6 +9,11 @@ const PUNTOS = [
     { id: 'ramal2', nombre: 'Ramal 2', lat: 7.0880, lng: -73.1290, color: '#e76f51' },
 ]
 
+const CENTRO = [7.0900, -73.1310]
+const VERDE = '#2e7d32'   // usuario activo
+const ROJO = '#c62828'    // usuario inactivo
+
+//icono redondo para la infraestructura (bocatoma y ramales)
 function crearIcono(color) {
     return L.divIcon({
         className: 'mapa-marcador',
@@ -22,16 +27,48 @@ function crearIcono(color) {
     })
 }
 
-export default function MapaUbicacion() {
+//icono para los usuarios: verde si esta activo, rojo si no
+function crearIconoUsuario(activo) {
+    const color = activo ? VERDE : ROJO
+    return L.divIcon({
+        className: 'mapa-marcador-usuario',
+        html: `<div style="
+            width: 16px; height: 16px; border-radius: 50%;
+            background: ${color}; border: 2px solid white;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+        "></div>`,
+        iconSize: [16, 16],
+        iconAnchor: [8, 8],
+    })
+}
+
+//si el usuario no tiene coordenadas, le damos una posicion ESTABLE (siempre la misma)
+//cerca de la vereda, calculada a partir de su nombre de usuario
+function posicionUsuario(u) {
+    if (typeof u.latitud === 'number' && typeof u.longitud === 'number') {
+        return [u.latitud, u.longitud]
+    }
+    let h = 0
+    const s = u.usuario || ''
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
+    const desplazamientoLat = ((h % 1000) / 1000 - 0.5) * 0.008        // ~±0.004 grados
+    const desplazamientoLng = ((Math.floor(h / 1000) % 1000) / 1000 - 0.5) * 0.008
+    return [CENTRO[0] + desplazamientoLat, CENTRO[1] + desplazamientoLng]
+}
+
+export default function MapaUbicacion({ api, cabeceras }) {
     const contenedorRef = useRef(null)
     const mapaRef = useRef(null)
+    const capaUsuariosRef = useRef(null)
+    const [mapaListo, setMapaListo] = useState(false)
+    const [usuarios, setUsuarios] = useState([])
 
+    //Se crea el mapa una sola vez, con la infraestructura (bocatoma y ramales)
     useEffect(() => {
         if (mapaRef.current || !contenedorRef.current) return
 
-        const centro = [7.0900, -73.1310]
         const mapa = L.map(contenedorRef.current, {
-            center: centro,
+            center: CENTRO,
             zoom: 15,
             scrollWheelZoom: false,
         })
@@ -42,7 +79,6 @@ export default function MapaUbicacion() {
         }).addTo(mapa)
 
         const coordenadas = PUNTOS.map((p) => [p.lat, p.lng])
-
         //esta linea punteada representa la tuberia (bocatoma -> ramal1 -> ramal2)
         L.polyline(coordenadas, { color: '#176b87', weight: 3, dashArray: '6 6' }).addTo(mapa)
 
@@ -52,13 +88,52 @@ export default function MapaUbicacion() {
                 .bindPopup(`<strong>${p.nombre}</strong>`)
         })
 
+        //capa aparte para los usuarios, asi la podemos limpiar y volver a dibujar
+        capaUsuariosRef.current = L.layerGroup().addTo(mapa)
+
         mapaRef.current = mapa
+        setMapaListo(true)
 
         return () => {
             mapa.remove()
             mapaRef.current = null
+            capaUsuariosRef.current = null
+            setMapaListo(false)
         }
     }, [])
+
+    //Se traen los usuarios al montar y cada 15 seg (para reflejar activo/inactivo)
+    useEffect(() => {
+        if (!api) return
+        let vivo = true
+        async function cargar() {
+            try {
+                const { data } = await api.get('/api/usuarios/mapa', { headers: cabeceras })
+                if (vivo) setUsuarios(Array.isArray(data) ? data : [])
+            } catch { /* si falla, dejamos el mapa solo con la infraestructura */ }
+        }
+        cargar()
+        const id = setInterval(cargar, 15000)
+        return () => { vivo = false; clearInterval(id) }
+    }, [api, cabeceras])
+
+    //Cada vez que cambian los usuarios (o el mapa queda listo), se redibujan los marcadores
+    useEffect(() => {
+        if (!mapaListo || !capaUsuariosRef.current) return
+        const capa = capaUsuariosRef.current
+        capa.clearLayers()
+        usuarios.forEach((u) => {
+            const [lat, lng] = posicionUsuario(u)
+            const nombre = (u.nombre || u.usuario || 'Usuario').trim()
+            const estado = u.esta_activo ? 'Activo' : 'Inactivo'
+            L.marker([lat, lng], { icon: crearIconoUsuario(u.esta_activo) })
+                .addTo(capa)
+                .bindPopup(`<strong>${nombre}</strong><br/>@${u.usuario}<br/>Estado: ${estado}`)
+        })
+    }, [usuarios, mapaListo])
+
+    const activos = usuarios.filter((u) => u.esta_activo).length
+    const inactivos = usuarios.length - activos
 
     return (
         <div className="panel panel-wide mapa-section">
@@ -75,6 +150,8 @@ export default function MapaUbicacion() {
                         <span className="dot" style={{ background: p.color }} /> {p.nombre}
                     </span>
                 ))}
+                <span><span className="dot" style={{ background: VERDE }} /> Usuario activo ({activos})</span>
+                <span><span className="dot" style={{ background: ROJO }} /> Usuario inactivo ({inactivos})</span>
             </div>
         </div>
     )
