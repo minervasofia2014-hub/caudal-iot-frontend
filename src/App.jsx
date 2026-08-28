@@ -48,7 +48,13 @@ function GraficaLinea({ data, color = '#176b87', label }) {
                         {puntos.map((punto, i) => { const [cx, cy] = punto.split(','); return <circle cx={cx} cy={cy} fill={color} key={i} r="4" /> })}
                     </>
                 )}
-                {data.length === 0 && <text x={ancho / 2} y={alto / 2} textAnchor="middle" fill="#aaa" fontSize="13">Sin datos aún</text>}
+                {data.length <= 1 && (
+                    <>
+                        {/* Sin datos (recién reiniciado): línea plana en 0 en la base */}
+                        <line x1={margen} x2={ancho - margen} y1={alto - margen} y2={alto - margen} stroke={color} strokeWidth="3" />
+                        <text x={margen + 4} y={alto - margen - 6} fill="#aaa" fontSize="12">0</text>
+                    </>
+                )}
             </svg>
         </div>
     )
@@ -359,10 +365,12 @@ function App() {
     }
 
     async function reiniciarSistema() {
-        if (!window.confirm('¿Reiniciar los contadores de los 3 sensores a 0?\nSe borrará el historial de mediciones. Esta acción no se puede deshacer.')) return
+        if (!window.confirm('¿Reiniciar los contadores de los 3 sensores a 0?\nSe guardará un registro histórico y se borrará el historial de mediciones. Esta acción no se puede deshacer.')) return
         try {
             await api.post('/api/v1/reiniciar/', null, { headers: cabeceras })
-            setDashboard(null); setError('')
+            // Vacía las lecturas locales de una vez para que las gráficas queden en 0
+            setDashboard(prev => prev ? { ...prev, recent_readings: [], latest: null } : prev)
+            setError('')
         } catch { alert('No fue posible reiniciar el sistema.') }
     }
 
