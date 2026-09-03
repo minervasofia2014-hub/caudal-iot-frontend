@@ -56,12 +56,49 @@ function posicionUsuario(u) {
     return [CENTRO[0] + desplazamientoLat, CENTRO[1] + desplazamientoLng]
 }
 
-export default function MapaUbicacion({ api, cabeceras }) {
+export default function MapaUbicacion({ api, cabeceras, lecturas = [] }) {
     const contenedorRef = useRef(null)
     const mapaRef = useRef(null)
     const capaUsuariosRef = useRef(null)
     const [mapaListo, setMapaListo] = useState(false)
     const [usuarios, setUsuarios] = useState([])
+
+    // nombres legibles y colores por sensor
+    const INFO_SENSOR = {
+        sensor_01: { nombre: 'Bocatoma', color: '#0077b6' },
+        sensor_02: { nombre: 'Ramal 1', color: '#2a9d8f' },
+        sensor_03: { nombre: 'Ramal 2', color: '#e76f51' },
+    }
+
+    // arma una mini-gráfica SVG (sparkline) del caudal del sensor asociado al usuario
+    function graficaSensorHTML(sensorId) {
+        if (!sensorId || !INFO_SENSOR[sensorId]) {
+            return `<div style="color:#888;font-size:12px;margin-top:6px">Sin punto de medición asignado</div>`
+        }
+        const info = INFO_SENSOR[sensorId]
+        const serie = lecturas
+            .filter(r => r.sensor_id === sensorId)
+            .slice(0, 20).reverse()
+            .map(r => Number(r.caudal_entrada) || 0)
+        if (serie.length < 2) {
+            return `<div style="margin-top:6px"><strong style="color:${info.color}">${info.nombre}</strong><br/><span style="color:#888;font-size:12px">Aún sin datos suficientes</span></div>`
+        }
+        const w = 200, h = 60, pad = 6
+        const max = Math.max(...serie, 1), min = Math.min(...serie, 0)
+        const rango = (max - min) || 1
+        const pts = serie.map((v, i) => {
+            const x = pad + (i * (w - 2 * pad)) / (serie.length - 1)
+            const y = h - pad - ((v - min) / rango) * (h - 2 * pad)
+            return `${x.toFixed(1)},${y.toFixed(1)}`
+        }).join(' ')
+        const actual = serie[serie.length - 1].toFixed(1)
+        return `<div style="margin-top:6px">
+            <strong style="color:${info.color}">${info.nombre}</strong>
+            <span style="float:right;font-weight:bold;color:${info.color}">${actual} mL/min</span>
+            <svg width="${w}" height="${h}" style="display:block;margin-top:4px">
+              <polyline fill="none" stroke="${info.color}" stroke-width="2" points="${pts}"/>
+            </svg></div>`
+    }
 
     //Se crea el mapa una sola vez, con la infraestructura (bocatoma y ramales)
     useEffect(() => {
@@ -126,11 +163,12 @@ export default function MapaUbicacion({ api, cabeceras }) {
             const [lat, lng] = posicionUsuario(u)
             const nombre = (u.nombre || u.usuario || 'Usuario').trim()
             const estado = u.esta_activo ? 'Activo' : 'Inactivo'
+            const grafica = graficaSensorHTML(u.sensor_asociado)
             L.marker([lat, lng], { icon: crearIconoUsuario(u.esta_activo) })
                 .addTo(capa)
-                .bindPopup(`<strong>${nombre}</strong><br/>@${u.usuario}<br/>Estado: ${estado}`)
+                .bindPopup(`<strong>${nombre}</strong><br/>@${u.usuario}<br/>Estado: ${estado}${grafica}`, { minWidth: 220 })
         })
-    }, [usuarios, mapaListo])
+    }, [usuarios, mapaListo, lecturas])
 
     const activos = usuarios.filter((u) => u.esta_activo).length
     const inactivos = usuarios.length - activos

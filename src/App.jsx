@@ -173,10 +173,11 @@ function PanelUsuarios({ api, cabeceras }) {
         try {
             const latitud = valorCoord(u, 'lat')
             const longitud = valorCoord(u, 'lng')
-            await api.put(`/api/usuarios/${u._id}`, { ...u, latitud, longitud }, { headers: cabeceras })
+            const sensor_asociado = coords[u._id]?.sensor !== undefined ? coords[u._id].sensor : (u.sensor_asociado || '')
+            await api.put(`/api/usuarios/${u._id}`, { ...u, latitud, longitud, sensor_asociado }, { headers: cabeceras })
             setCoords((c) => { const n = { ...c }; delete n[u._id]; return n })
             await cargarUsuarios()
-        } catch { alert('No fue posible guardar las coordenadas') }
+        } catch { alert('No fue posible guardar los datos del usuario') }
         finally { setOcupado(null) }
     }
 
@@ -190,6 +191,12 @@ function PanelUsuarios({ api, cabeceras }) {
         setOcupado(u._id)
         try { await api.put(`/api/usuarios/${u._id}`, { ...u, es_administrador: !u.es_administrador }, { headers: cabeceras }); await cargarUsuarios() }
         catch { alert('No fue posible actualizar el usuario') }
+        finally { setOcupado(null) }
+    }
+    async function alternarActivo(u) {
+        setOcupado(u._id)
+        try { await api.put(`/api/usuarios/${u._id}`, { ...u, esta_activo: !u.esta_activo }, { headers: cabeceras }); await cargarUsuarios() }
+        catch { alert('No fue posible cambiar el estado del usuario') }
         finally { setOcupado(null) }
     }
     async function eliminar(id) {
@@ -207,7 +214,7 @@ function PanelUsuarios({ api, cabeceras }) {
             {error && <div className="alert-banner">{error}</div>}
             <div className="table-wrap">
                 <table>
-                    <thead><tr><th>Usuario</th><th>Nombre</th><th>Correo</th><th>Estado</th><th>Rol</th><th>Ubicación (lat, lng)</th><th>Acciones</th></tr></thead>
+                    <thead><tr><th>Usuario</th><th>Nombre</th><th>Correo</th><th>Estado</th><th>Rol</th><th>Ubicación (lat, lng) y punto</th><th>Acciones</th></tr></thead>
                     <tbody>
                         {usuarios.map((u) => (
                             <tr key={u._id}>
@@ -219,10 +226,17 @@ function PanelUsuarios({ api, cabeceras }) {
                                 <td className="admin-actions">
                                     <input type="number" step="any" placeholder="lat" value={valorCoord(u, 'lat')} onChange={(e) => editarCoord(u._id, 'lat', e.target.value)} style={{ width: 90 }} />
                                     <input type="number" step="any" placeholder="lng" value={valorCoord(u, 'lng')} onChange={(e) => editarCoord(u._id, 'lng', e.target.value)} style={{ width: 90 }} />
+                                    <select value={coords[u._id]?.sensor !== undefined ? coords[u._id].sensor : (u.sensor_asociado || '')} onChange={(e) => editarCoord(u._id, 'sensor', e.target.value)} style={{ width: 110 }}>
+                                        <option value="">— punto —</option>
+                                        <option value="sensor_01">Bocatoma</option>
+                                        <option value="sensor_02">Ramal 1</option>
+                                        <option value="sensor_03">Ramal 2</option>
+                                    </select>
                                     <button className="btn-mini" disabled={ocupado === u._id} onClick={() => guardarCoords(u)} type="button">📍 Guardar</button>
                                 </td>
                                 <td className="admin-actions">
                                     {!u.esta_activo && <button className="btn-mini btn-mini-aprobar" disabled={ocupado === u._id} onClick={() => aprobar(u._id)} type="button">Aprobar</button>}
+                                    <button className="btn-mini" disabled={ocupado === u._id} onClick={() => alternarActivo(u)} type="button" style={{ background: u.esta_activo ? '#e8f5e9' : '#fdecea', color: u.esta_activo ? '#2e7d32' : '#c62828', borderColor: u.esta_activo ? '#2e7d32' : '#c62828' }}>{u.esta_activo ? '🟢 Activo' : '🔴 Inactivo'}</button>
                                     <button className="btn-mini" disabled={ocupado === u._id} onClick={() => cambiarRol(u)} type="button">{u.es_administrador ? 'Quitar admin' : 'Hacer admin'}</button>
                                     <button className="btn-mini btn-mini-eliminar" disabled={ocupado === u._id} onClick={() => eliminar(u._id)} type="button">Eliminar</button>
                                 </td>
@@ -233,6 +247,42 @@ function PanelUsuarios({ api, cabeceras }) {
                 </table>
             </div>
         </section>
+    )
+}
+
+function HistorialReinicios({ api, cabeceras }) {
+    const [lista, setLista] = useState([])
+    useEffect(() => {
+        let vivo = true
+        async function cargar() {
+            try { const { data } = await api.get('/api/v1/reinicios/', { headers: cabeceras }); if (vivo) setLista(data?.datos || []) }
+            catch { /* si falla, no mostramos nada */ }
+        }
+        cargar()
+        const id = setInterval(cargar, 20000)
+        return () => { vivo = false; clearInterval(id) }
+    }, [api, cabeceras])
+
+    if (lista.length === 0) return null
+    return (
+        <div className="panel panel-wide" style={{ marginTop: 16 }}>
+            <div className="panel-heading">
+                <div>
+                    <p className="eyebrow">Historial</p>
+                    <h2>Reinicios del sistema</h2>
+                </div>
+            </div>
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                {lista.map((r, i) => (
+                    <li key={i} style={{ padding: '8px 4px', borderBottom: '1px solid #eee', fontSize: 14 }}>
+                        <strong>Se reinició</strong> el {formatearFecha(r.fecha)} · por <em>{r.reiniciado_por}</em>
+                        <span style={{ color: '#888', marginLeft: 8 }}>
+                            (Bocatoma {Math.round(r.total_s1)} mL · Ramal 1 {Math.round(r.total_s2)} mL · Ramal 2 {Math.round(r.total_s3)} mL)
+                        </span>
+                    </li>
+                ))}
+            </ul>
+        </div>
     )
 }
 
@@ -504,7 +554,8 @@ function App() {
                         <BarraBalance entrada={entrada} salida1={salida1} salida2={salida2} balance={dashboard?.balance} />
                     </section>
 
-                    <MapaUbicacion api={api} cabeceras={cabeceras} />
+                    <MapaUbicacion api={api} cabeceras={cabeceras} lecturas={lecturas} />
+                    <HistorialReinicios api={api} cabeceras={cabeceras} />
 
                     <section className="valvulas-section">
                         <h2 className="section-title">Control de electroválvulas</h2>
