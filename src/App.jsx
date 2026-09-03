@@ -258,6 +258,7 @@ function PanelUsuarios({ api, cabeceras }) {
 function HistorialReinicios({ api, cabeceras }) {
     const [vista, setVista] = useState('caudal') // caudal | reinicios
     const [rango, setRango] = useState('semanal') // semanal | mensual
+    const [sensorFiltro, setSensorFiltro] = useState('todos') // todos | sensor_01/02/03
     const [caudal, setCaudal] = useState([])
     const [reinicios, setReinicios] = useState([])
 
@@ -299,15 +300,20 @@ function HistorialReinicios({ api, cabeceras }) {
 
             {vista === 'caudal' && (
                 <>
-                    <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+                    <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                         <button className="btn-mini" type="button" onClick={() => setRango('semanal')} style={rango === 'semanal' ? { background: '#2a9d8f', color: '#fff', borderColor: '#2a9d8f' } : {}}>Por semana</button>
                         <button className="btn-mini" type="button" onClick={() => setRango('mensual')} style={rango === 'mensual' ? { background: '#2a9d8f', color: '#fff', borderColor: '#2a9d8f' } : {}}>Por mes</button>
+                        <span style={{ margin: '0 4px', color: '#ccc' }}>|</span>
+                        <button className="btn-mini" type="button" onClick={() => setSensorFiltro('todos')} style={sensorFiltro === 'todos' ? { background: '#176b87', color: '#fff', borderColor: '#176b87' } : {}}>Todos</button>
+                        <button className="btn-mini" type="button" onClick={() => setSensorFiltro('sensor_01')} style={sensorFiltro === 'sensor_01' ? { background: '#0077b6', color: '#fff', borderColor: '#0077b6' } : {}}>Bocatoma</button>
+                        <button className="btn-mini" type="button" onClick={() => setSensorFiltro('sensor_02')} style={sensorFiltro === 'sensor_02' ? { background: '#2a9d8f', color: '#fff', borderColor: '#2a9d8f' } : {}}>Ramal 1</button>
+                        <button className="btn-mini" type="button" onClick={() => setSensorFiltro('sensor_03')} style={sensorFiltro === 'sensor_03' ? { background: '#e76f51', color: '#fff', borderColor: '#e76f51' } : {}}>Ramal 2</button>
                     </div>
                     <div className="table-wrap">
                         <table>
                             <thead><tr><th>{rango === 'mensual' ? 'Mes' : 'Semana'}</th><th>Punto</th><th>Caudal promedio (mL/min)</th><th>Bloques</th></tr></thead>
                             <tbody>
-                                {caudal.map((d, i) => (
+                                {caudal.filter(d => sensorFiltro === 'todos' || d.sensor_id === sensorFiltro).map((d, i) => (
                                     <tr key={i}>
                                         <td>{d.periodo}</td>
                                         <td>{nombrePunto(d.sensor_id)}</td>
@@ -315,7 +321,7 @@ function HistorialReinicios({ api, cabeceras }) {
                                         <td>{d.bloques}</td>
                                     </tr>
                                 ))}
-                                {caudal.length === 0 && <tr><td colSpan="4" style={{ textAlign: 'center', color: '#aaa' }}>Aún no hay promedios archivados</td></tr>}
+                                {caudal.filter(d => sensorFiltro === 'todos' || d.sensor_id === sensorFiltro).length === 0 && <tr><td colSpan="4" style={{ textAlign: 'center', color: '#aaa' }}>Aún no hay promedios archivados</td></tr>}
                             </tbody>
                         </table>
                     </div>
