@@ -168,10 +168,17 @@ export default function MapaUbicacion({ api, cabeceras, lecturas = [] }) {
         const capaInfra = capaInfraRef.current
         capaInfra.clearLayers()
         PUNTOS.forEach((p) => {
-            const grafica = graficaSensorHTML(PUNTO_SENSOR[p.id])
+            const sensorId = PUNTO_SENSOR[p.id]
+            //si hay un usuario asignado a este punto, se usa SU nombre en el mapa
+            const usuarioAsignado = usuarios.find((u) => u.sensor_asociado === sensorId)
+            const titulo = usuarioAsignado
+                ? `${(usuarioAsignado.nombre || usuarioAsignado.usuario).trim()} <span style="color:#888;font-weight:normal">(${p.nombre})</span>`
+                : p.nombre
+            const grafica = graficaSensorHTML(sensorId, p.nombre)
             L.marker([p.lat, p.lng], { icon: crearIcono(p.color) })
                 .addTo(capaInfra)
-                .bindPopup(`<strong>${p.nombre}</strong>${grafica}`, { minWidth: 220 })
+                .bindPopup(`<strong>${titulo}</strong>${grafica}`, { minWidth: 220 })
+                .bindTooltip(usuarioAsignado ? (usuarioAsignado.nombre || usuarioAsignado.usuario).trim() : p.nombre, { permanent: false, direction: 'top' })
         })
 
         //--- usuarios ---

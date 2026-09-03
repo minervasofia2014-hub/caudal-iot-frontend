@@ -323,17 +323,23 @@ function HistorialReinicios({ api, cabeceras }) {
             )}
 
             {vista === 'reinicios' && (
-                <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                    {reinicios.map((r, i) => (
-                        <li key={i} style={{ padding: '8px 4px', borderBottom: '1px solid #eee', fontSize: 14 }}>
-                            <strong>Se reinició</strong> el {formatearFecha(r.fecha)} · por <em>{r.reiniciado_por}</em>
-                            <span style={{ color: '#888', marginLeft: 8 }}>
-                                (Bocatoma {Math.round(r.total_s1)} mL · Ramal 1 {Math.round(r.total_s2)} mL · Ramal 2 {Math.round(r.total_s3)} mL)
-                            </span>
-                        </li>
-                    ))}
-                    {reinicios.length === 0 && <li style={{ color: '#aaa', padding: 8 }}>Aún no se ha reiniciado el sistema</li>}
-                </ul>
+                <div className="table-wrap">
+                    <table>
+                        <thead><tr><th>Fecha del reinicio</th><th>Realizado por</th><th>Bocatoma</th><th>Ramal 1</th><th>Ramal 2</th></tr></thead>
+                        <tbody>
+                            {reinicios.map((r, i) => (
+                                <tr key={i}>
+                                    <td><strong>{formatearFecha(r.fecha)}</strong></td>
+                                    <td>👤 {r.reiniciado_por}</td>
+                                    <td>{Math.round(r.total_s1)} mL</td>
+                                    <td>{Math.round(r.total_s2)} mL</td>
+                                    <td>{Math.round(r.total_s3)} mL</td>
+                                </tr>
+                            ))}
+                            {reinicios.length === 0 && <tr><td colSpan="5" style={{ textAlign: 'center', color: '#aaa' }}>Aún no se ha reiniciado el sistema</td></tr>}
+                        </tbody>
+                    </table>
+                </div>
             )}
         </div>
     )
@@ -608,7 +614,6 @@ function App() {
                     </section>
 
                     <MapaUbicacion api={api} cabeceras={cabeceras} lecturas={lecturas} />
-                    <HistorialReinicios api={api} cabeceras={cabeceras} />
 
                     <section className="valvulas-section">
                         <h2 className="section-title">Control de electroválvulas</h2>
@@ -626,6 +631,8 @@ function App() {
                             ))}
                         </div>
                     </section>
+
+                    <HistorialReinicios api={api} cabeceras={cabeceras} />
 
                     <section className="panel panel-wide historial-section">
                         <div className="panel-heading">
