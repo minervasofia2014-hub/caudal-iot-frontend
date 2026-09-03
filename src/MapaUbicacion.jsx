@@ -125,10 +125,6 @@ export default function MapaUbicacion({ api, cabeceras, lecturas = [] }) {
             maxZoom: 19,
         }).addTo(mapa)
 
-        const coordenadas = PUNTOS.map((p) => [p.lat, p.lng])
-        //esta linea punteada representa la tuberia (bocatoma -> ramal1 -> ramal2)
-        L.polyline(coordenadas, { color: '#176b87', weight: 3, dashArray: '6 6' }).addTo(mapa)
-
         //capas aparte para infraestructura y usuarios, así se redibujan con datos frescos
         capaInfraRef.current = L.layerGroup().addTo(mapa)
         capaUsuariosRef.current = L.layerGroup().addTo(mapa)
@@ -160,26 +156,9 @@ export default function MapaUbicacion({ api, cabeceras, lecturas = [] }) {
         return () => { vivo = false; clearInterval(id) }
     }, [api, cabeceras])
 
-    //Cada vez que cambian los usuarios/lecturas (o el mapa queda listo), se redibuja todo
+    //Cada vez que cambian los usuarios/lecturas (o el mapa queda listo), se redibujan los usuarios
     useEffect(() => {
-        if (!mapaListo || !capaUsuariosRef.current || !capaInfraRef.current) return
-
-        //--- puntos de infraestructura (Bocatoma, Ramal 1, Ramal 2) con su gráfica ---
-        const capaInfra = capaInfraRef.current
-        capaInfra.clearLayers()
-        PUNTOS.forEach((p) => {
-            const sensorId = PUNTO_SENSOR[p.id]
-            //si hay un usuario asignado a este punto, se usa SU nombre en el mapa
-            const usuarioAsignado = usuarios.find((u) => u.sensor_asociado === sensorId)
-            const titulo = usuarioAsignado
-                ? `${(usuarioAsignado.nombre || usuarioAsignado.usuario).trim()} <span style="color:#888;font-weight:normal">(${p.nombre})</span>`
-                : p.nombre
-            const grafica = graficaSensorHTML(sensorId, p.nombre)
-            L.marker([p.lat, p.lng], { icon: crearIcono(p.color) })
-                .addTo(capaInfra)
-                .bindPopup(`<strong>${titulo}</strong>${grafica}`, { minWidth: 220 })
-                .bindTooltip(usuarioAsignado ? (usuarioAsignado.nombre || usuarioAsignado.usuario).trim() : p.nombre, { permanent: false, direction: 'top' })
-        })
+        if (!mapaListo || !capaUsuariosRef.current) return
 
         //--- usuarios ---
         const capa = capaUsuariosRef.current
@@ -215,11 +194,6 @@ export default function MapaUbicacion({ api, cabeceras, lecturas = [] }) {
             </div>
             <div className="mapa-contenedor" ref={contenedorRef} />
             <div className="mapa-leyenda">
-                {PUNTOS.map((p) => (
-                    <span key={p.id}>
-                        <span className="dot" style={{ background: p.color }} /> {p.nombre}
-                    </span>
-                ))}
                 <span><span className="dot" style={{ background: VERDE }} /> Usuario activo ({activos})</span>
                 <span><span className="dot" style={{ background: ROJO }} /> Usuario inactivo ({inactivos})</span>
             </div>

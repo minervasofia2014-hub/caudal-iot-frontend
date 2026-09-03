@@ -301,6 +301,7 @@ function HistorialReinicios({ api, cabeceras }) {
             {vista === 'caudal' && (
                 <>
                     <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <button className="btn-mini" type="button" onClick={() => setRango('diario')} style={rango === 'diario' ? { background: '#2a9d8f', color: '#fff', borderColor: '#2a9d8f' } : {}}>Por día</button>
                         <button className="btn-mini" type="button" onClick={() => setRango('semanal')} style={rango === 'semanal' ? { background: '#2a9d8f', color: '#fff', borderColor: '#2a9d8f' } : {}}>Por semana</button>
                         <button className="btn-mini" type="button" onClick={() => setRango('mensual')} style={rango === 'mensual' ? { background: '#2a9d8f', color: '#fff', borderColor: '#2a9d8f' } : {}}>Por mes</button>
                         <span style={{ margin: '0 4px', color: '#ccc' }}>|</span>
@@ -311,7 +312,7 @@ function HistorialReinicios({ api, cabeceras }) {
                     </div>
                     <div className="table-wrap">
                         <table>
-                            <thead><tr><th>{rango === 'mensual' ? 'Mes' : 'Semana'}</th><th>Punto</th><th>Caudal promedio (mL/min)</th><th>Bloques</th></tr></thead>
+                            <thead><tr><th>{rango === 'mensual' ? 'Mes' : rango === 'diario' ? 'Día' : 'Semana'}</th><th>Punto</th><th>Caudal promedio (mL/min)</th><th>Bloques</th></tr></thead>
                             <tbody>
                                 {caudal.filter(d => sensorFiltro === 'todos' || d.sensor_id === sensorFiltro).map((d, i) => (
                                     <tr key={i}>
@@ -330,19 +331,29 @@ function HistorialReinicios({ api, cabeceras }) {
 
             {vista === 'reinicios' && (
                 <div className="table-wrap">
-                    <table>
-                        <thead><tr><th>Fecha del reinicio</th><th>Realizado por</th><th>Bocatoma</th><th>Ramal 1</th><th>Ramal 2</th></tr></thead>
+                    <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+                        <thead>
+                            <tr style={{ background: '#176b87', color: '#fff' }}>
+                                <th style={{ padding: '10px 12px', textAlign: 'left' }}>#</th>
+                                <th style={{ padding: '10px 12px', textAlign: 'left' }}>Fecha del reinicio</th>
+                                <th style={{ padding: '10px 12px', textAlign: 'left' }}>Realizado por</th>
+                                <th style={{ padding: '10px 12px', textAlign: 'right' }}>Bocatoma</th>
+                                <th style={{ padding: '10px 12px', textAlign: 'right' }}>Ramal 1</th>
+                                <th style={{ padding: '10px 12px', textAlign: 'right' }}>Ramal 2</th>
+                            </tr>
+                        </thead>
                         <tbody>
                             {reinicios.map((r, i) => (
-                                <tr key={i}>
-                                    <td><strong>{formatearFecha(r.fecha)}</strong></td>
-                                    <td>👤 {r.reiniciado_por}</td>
-                                    <td>{Math.round(r.total_s1)} mL</td>
-                                    <td>{Math.round(r.total_s2)} mL</td>
-                                    <td>{Math.round(r.total_s3)} mL</td>
+                                <tr key={i} style={{ background: i % 2 === 0 ? '#f7fafb' : '#ffffff', borderBottom: '1px solid #e6ecee' }}>
+                                    <td style={{ padding: '9px 12px', color: '#888' }}>{i + 1}</td>
+                                    <td style={{ padding: '9px 12px', fontWeight: 600 }}>{formatearFecha(r.fecha)}</td>
+                                    <td style={{ padding: '9px 12px' }}>👤 {r.reiniciado_por}</td>
+                                    <td style={{ padding: '9px 12px', textAlign: 'right' }}>{Math.round(r.total_s1)} mL</td>
+                                    <td style={{ padding: '9px 12px', textAlign: 'right' }}>{Math.round(r.total_s2)} mL</td>
+                                    <td style={{ padding: '9px 12px', textAlign: 'right' }}>{Math.round(r.total_s3)} mL</td>
                                 </tr>
                             ))}
-                            {reinicios.length === 0 && <tr><td colSpan="5" style={{ textAlign: 'center', color: '#aaa' }}>Aún no se ha reiniciado el sistema</td></tr>}
+                            {reinicios.length === 0 && <tr><td colSpan="6" style={{ textAlign: 'center', color: '#aaa', padding: 14 }}>Aún no se ha reiniciado el sistema</td></tr>}
                         </tbody>
                     </table>
                 </div>
