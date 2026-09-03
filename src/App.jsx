@@ -151,6 +151,7 @@ function PanelUsuarios({ api, cabeceras }) {
     const [error, setError] = useState('')
     const [ocupado, setOcupado] = useState(null)
     const [coords, setCoords] = useState({}) // edición de lat/lng por usuario
+    const [filtro, setFiltro] = useState('todos') // todos | activos | inactivos
 
     async function cargarUsuarios() {
         try { const { data } = await api.get('/api/usuarios', { headers: cabeceras }); setUsuarios(data); setError('') }
@@ -199,24 +200,29 @@ function PanelUsuarios({ api, cabeceras }) {
         catch { alert('No fue posible cambiar el estado del usuario') }
         finally { setOcupado(null) }
     }
-    async function eliminar(id) {
-        if (!window.confirm('¿Eliminar este usuario? Esta acción no se puede deshacer.')) return
-        setOcupado(id)
-        try { await api.delete(`/api/usuarios/${id}`, { headers: cabeceras }); await cargarUsuarios() }
-        catch { alert('No fue posible eliminar el usuario') }
-        finally { setOcupado(null) }
-    }
+    const total = usuarios.length
+    const nActivos = usuarios.filter(u => u.esta_activo).length
+    const nInactivos = total - nActivos
+    const usuariosFiltrados = usuarios.filter(u =>
+        filtro === 'activos' ? u.esta_activo : filtro === 'inactivos' ? !u.esta_activo : true)
 
     if (cargando) return <p>Cargando usuarios...</p>
     return (
         <section className="panel panel-wide historial-section">
-            <div className="panel-heading"><div><p className="eyebrow">Administración</p><h2>Usuarios registrados</h2></div></div>
+            <div className="panel-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                <div><p className="eyebrow">Administración</p><h2>Usuarios registrados</h2></div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                    <button className="btn-mini" type="button" onClick={() => setFiltro('todos')} style={filtro === 'todos' ? { background: '#176b87', color: '#fff', borderColor: '#176b87' } : {}}>Todos ({total})</button>
+                    <button className="btn-mini" type="button" onClick={() => setFiltro('activos')} style={filtro === 'activos' ? { background: '#2e7d32', color: '#fff', borderColor: '#2e7d32' } : {}}>🟢 Activos ({nActivos})</button>
+                    <button className="btn-mini" type="button" onClick={() => setFiltro('inactivos')} style={filtro === 'inactivos' ? { background: '#c62828', color: '#fff', borderColor: '#c62828' } : {}}>🔴 Inactivos ({nInactivos})</button>
+                </div>
+            </div>
             {error && <div className="alert-banner">{error}</div>}
             <div className="table-wrap">
                 <table>
                     <thead><tr><th>Usuario</th><th>Nombre</th><th>Correo</th><th>Estado</th><th>Rol</th><th>Ubicación (lat, lng) y punto</th><th>Acciones</th></tr></thead>
                     <tbody>
-                        {usuarios.map((u) => (
+                        {usuariosFiltrados.map((u) => (
                             <tr key={u._id}>
                                 <td>{u.usuario}</td>
                                 <td>{u.nombre} {u.apellido}</td>
@@ -238,11 +244,10 @@ function PanelUsuarios({ api, cabeceras }) {
                                     {!u.esta_activo && <button className="btn-mini btn-mini-aprobar" disabled={ocupado === u._id} onClick={() => aprobar(u._id)} type="button">Aprobar</button>}
                                     <button className="btn-mini" disabled={ocupado === u._id} onClick={() => alternarActivo(u)} type="button" style={{ background: u.esta_activo ? '#e8f5e9' : '#fdecea', color: u.esta_activo ? '#2e7d32' : '#c62828', borderColor: u.esta_activo ? '#2e7d32' : '#c62828' }}>{u.esta_activo ? '🟢 Activo' : '🔴 Inactivo'}</button>
                                     <button className="btn-mini" disabled={ocupado === u._id} onClick={() => cambiarRol(u)} type="button">{u.es_administrador ? 'Quitar admin' : 'Hacer admin'}</button>
-                                    <button className="btn-mini btn-mini-eliminar" disabled={ocupado === u._id} onClick={() => eliminar(u._id)} type="button">Eliminar</button>
                                 </td>
                             </tr>
                         ))}
-                        {usuarios.length === 0 && <tr><td colSpan="7" style={{ textAlign: 'center', color: '#aaa' }}>Sin usuarios</td></tr>}
+                        {usuariosFiltrados.length === 0 && <tr><td colSpan="7" style={{ textAlign: 'center', color: '#aaa' }}>Sin usuarios en este filtro</td></tr>}
                     </tbody>
                 </table>
             </div>
@@ -251,37 +256,85 @@ function PanelUsuarios({ api, cabeceras }) {
 }
 
 function HistorialReinicios({ api, cabeceras }) {
-    const [lista, setLista] = useState([])
+    const [vista, setVista] = useState('caudal') // caudal | reinicios
+    const [rango, setRango] = useState('semanal') // semanal | mensual
+    const [caudal, setCaudal] = useState([])
+    const [reinicios, setReinicios] = useState([])
+
+    // historial de caudal (promedios) según el rango elegido
     useEffect(() => {
         let vivo = true
         async function cargar() {
-            try { const { data } = await api.get('/api/v1/reinicios/', { headers: cabeceras }); if (vivo) setLista(data?.datos || []) }
-            catch { /* si falla, no mostramos nada */ }
+            try { const { data } = await api.get(`/api/v1/historial/?rango=${rango}`, { headers: cabeceras }); if (vivo) setCaudal(data?.datos || []) }
+            catch { if (vivo) setCaudal([]) }
         }
         cargar()
-        const id = setInterval(cargar, 20000)
+        const id = setInterval(cargar, 30000)
+        return () => { vivo = false; clearInterval(id) }
+    }, [api, cabeceras, rango])
+
+    // historial de reinicios
+    useEffect(() => {
+        let vivo = true
+        async function cargar() {
+            try { const { data } = await api.get('/api/v1/reinicios/', { headers: cabeceras }); if (vivo) setReinicios(data?.datos || []) }
+            catch { if (vivo) setReinicios([]) }
+        }
+        cargar()
+        const id = setInterval(cargar, 30000)
         return () => { vivo = false; clearInterval(id) }
     }, [api, cabeceras])
 
-    if (lista.length === 0) return null
+    const nombrePunto = (s) => s === 'sensor_01' ? 'Bocatoma' : s === 'sensor_02' ? 'Ramal 1' : s === 'sensor_03' ? 'Ramal 2' : s
+
     return (
         <div className="panel panel-wide" style={{ marginTop: 16 }}>
-            <div className="panel-heading">
-                <div>
-                    <p className="eyebrow">Historial</p>
-                    <h2>Reinicios del sistema</h2>
+            <div className="panel-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                <div><p className="eyebrow">Historial</p><h2>Registros del sistema</h2></div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                    <button className="btn-mini" type="button" onClick={() => setVista('caudal')} style={vista === 'caudal' ? { background: '#176b87', color: '#fff', borderColor: '#176b87' } : {}}>Caudal (promedios)</button>
+                    <button className="btn-mini" type="button" onClick={() => setVista('reinicios')} style={vista === 'reinicios' ? { background: '#b8860b', color: '#fff', borderColor: '#b8860b' } : {}}>Reinicios</button>
                 </div>
             </div>
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                {lista.map((r, i) => (
-                    <li key={i} style={{ padding: '8px 4px', borderBottom: '1px solid #eee', fontSize: 14 }}>
-                        <strong>Se reinició</strong> el {formatearFecha(r.fecha)} · por <em>{r.reiniciado_por}</em>
-                        <span style={{ color: '#888', marginLeft: 8 }}>
-                            (Bocatoma {Math.round(r.total_s1)} mL · Ramal 1 {Math.round(r.total_s2)} mL · Ramal 2 {Math.round(r.total_s3)} mL)
-                        </span>
-                    </li>
-                ))}
-            </ul>
+
+            {vista === 'caudal' && (
+                <>
+                    <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+                        <button className="btn-mini" type="button" onClick={() => setRango('semanal')} style={rango === 'semanal' ? { background: '#2a9d8f', color: '#fff', borderColor: '#2a9d8f' } : {}}>Por semana</button>
+                        <button className="btn-mini" type="button" onClick={() => setRango('mensual')} style={rango === 'mensual' ? { background: '#2a9d8f', color: '#fff', borderColor: '#2a9d8f' } : {}}>Por mes</button>
+                    </div>
+                    <div className="table-wrap">
+                        <table>
+                            <thead><tr><th>{rango === 'mensual' ? 'Mes' : 'Semana'}</th><th>Punto</th><th>Caudal promedio (mL/min)</th><th>Bloques</th></tr></thead>
+                            <tbody>
+                                {caudal.map((d, i) => (
+                                    <tr key={i}>
+                                        <td>{d.periodo}</td>
+                                        <td>{nombrePunto(d.sensor_id)}</td>
+                                        <td><strong>{d.caudal_promedio}</strong></td>
+                                        <td>{d.bloques}</td>
+                                    </tr>
+                                ))}
+                                {caudal.length === 0 && <tr><td colSpan="4" style={{ textAlign: 'center', color: '#aaa' }}>Aún no hay promedios archivados</td></tr>}
+                            </tbody>
+                        </table>
+                    </div>
+                </>
+            )}
+
+            {vista === 'reinicios' && (
+                <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                    {reinicios.map((r, i) => (
+                        <li key={i} style={{ padding: '8px 4px', borderBottom: '1px solid #eee', fontSize: 14 }}>
+                            <strong>Se reinició</strong> el {formatearFecha(r.fecha)} · por <em>{r.reiniciado_por}</em>
+                            <span style={{ color: '#888', marginLeft: 8 }}>
+                                (Bocatoma {Math.round(r.total_s1)} mL · Ramal 1 {Math.round(r.total_s2)} mL · Ramal 2 {Math.round(r.total_s3)} mL)
+                            </span>
+                        </li>
+                    ))}
+                    {reinicios.length === 0 && <li style={{ color: '#aaa', padding: 8 }}>Aún no se ha reiniciado el sistema</li>}
+                </ul>
+            )}
         </div>
     )
 }

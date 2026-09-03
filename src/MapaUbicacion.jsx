@@ -60,8 +60,13 @@ export default function MapaUbicacion({ api, cabeceras, lecturas = [] }) {
     const contenedorRef = useRef(null)
     const mapaRef = useRef(null)
     const capaUsuariosRef = useRef(null)
+    const capaInfraRef = useRef(null)
     const [mapaListo, setMapaListo] = useState(false)
     const [usuarios, setUsuarios] = useState([])
+    const [filtroMapa, setFiltroMapa] = useState('todos') // todos | activos | inactivos
+
+    // a qué sensor corresponde cada punto de infraestructura del mapa
+    const PUNTO_SENSOR = { bocatoma: 'sensor_01', ramal1: 'sensor_02', ramal2: 'sensor_03' }
 
     // nombres legibles y colores por sensor
     const INFO_SENSOR = {
@@ -70,19 +75,23 @@ export default function MapaUbicacion({ api, cabeceras, lecturas = [] }) {
         sensor_03: { nombre: 'Ramal 2', color: '#e76f51' },
     }
 
-    // arma una mini-gráfica SVG (sparkline) del caudal del sensor asociado al usuario
-    function graficaSensorHTML(sensorId) {
-        if (!sensorId || !INFO_SENSOR[sensorId]) {
-            return `<div style="color:#888;font-size:12px;margin-top:6px">Sin punto de medición asignado</div>`
-        }
+    // arma una mini-gráfica SVG (sparkline) del caudal de un sensor.
+    // Si no hay sensor o no hay datos, dibuja una línea plana en 0.0.
+    function graficaSensorHTML(sensorId, nombreForzado) {
         const info = INFO_SENSOR[sensorId]
-        const serie = lecturas
-            .filter(r => r.sensor_id === sensorId)
-            .slice(0, 20).reverse()
-            .map(r => Number(r.caudal_entrada) || 0)
-        if (serie.length < 2) {
-            return `<div style="margin-top:6px"><strong style="color:${info.color}">${info.nombre}</strong><br/><span style="color:#888;font-size:12px">Aún sin datos suficientes</span></div>`
+        const nombre = nombreForzado || (info ? info.nombre : 'Sin punto')
+        const color = info ? info.color : '#888'
+        let serie = []
+        if (sensorId && INFO_SENSOR[sensorId]) {
+            serie = lecturas
+                .filter(r => r.sensor_id === sensorId)
+                .slice(0, 20).reverse()
+                .map(r => Number(r.caudal_entrada) || 0)
         }
+        // si no hay datos suficientes, se dibuja una línea plana en 0.0
+        let planaCero = false
+        if (serie.length < 2) { serie = [0, 0]; planaCero = true }
+
         const w = 200, h = 60, pad = 6
         const max = Math.max(...serie, 1), min = Math.min(...serie, 0)
         const rango = (max - min) || 1
@@ -91,12 +100,13 @@ export default function MapaUbicacion({ api, cabeceras, lecturas = [] }) {
             const y = h - pad - ((v - min) / rango) * (h - 2 * pad)
             return `${x.toFixed(1)},${y.toFixed(1)}`
         }).join(' ')
-        const actual = serie[serie.length - 1].toFixed(1)
+        const actual = (planaCero ? 0 : serie[serie.length - 1]).toFixed(1)
         return `<div style="margin-top:6px">
-            <strong style="color:${info.color}">${info.nombre}</strong>
-            <span style="float:right;font-weight:bold;color:${info.color}">${actual} mL/min</span>
+            <strong style="color:${color}">${nombre}</strong>
+            <span style="float:right;font-weight:bold;color:${color}">${actual} mL/min</span>
             <svg width="${w}" height="${h}" style="display:block;margin-top:4px">
-              <polyline fill="none" stroke="${info.color}" stroke-width="2" points="${pts}"/>
+              <line x1="${pad}" y1="${h - pad}" x2="${w - pad}" y2="${h - pad}" stroke="#e0e0e0" stroke-width="1"/>
+              <polyline fill="none" stroke="${color}" stroke-width="2" points="${pts}"/>
             </svg></div>`
     }
 
@@ -119,13 +129,8 @@ export default function MapaUbicacion({ api, cabeceras, lecturas = [] }) {
         //esta linea punteada representa la tuberia (bocatoma -> ramal1 -> ramal2)
         L.polyline(coordenadas, { color: '#176b87', weight: 3, dashArray: '6 6' }).addTo(mapa)
 
-        PUNTOS.forEach((p) => {
-            L.marker([p.lat, p.lng], { icon: crearIcono(p.color) })
-                .addTo(mapa)
-                .bindPopup(`<strong>${p.nombre}</strong>`)
-        })
-
-        //capa aparte para los usuarios, asi la podemos limpiar y volver a dibujar
+        //capas aparte para infraestructura y usuarios, así se redibujan con datos frescos
+        capaInfraRef.current = L.layerGroup().addTo(mapa)
         capaUsuariosRef.current = L.layerGroup().addTo(mapa)
 
         mapaRef.current = mapa
@@ -135,6 +140,7 @@ export default function MapaUbicacion({ api, cabeceras, lecturas = [] }) {
             mapa.remove()
             mapaRef.current = null
             capaUsuariosRef.current = null
+            capaInfraRef.current = null
             setMapaListo(false)
         }
     }, [])
@@ -154,12 +160,26 @@ export default function MapaUbicacion({ api, cabeceras, lecturas = [] }) {
         return () => { vivo = false; clearInterval(id) }
     }, [api, cabeceras])
 
-    //Cada vez que cambian los usuarios (o el mapa queda listo), se redibujan los marcadores
+    //Cada vez que cambian los usuarios/lecturas (o el mapa queda listo), se redibuja todo
     useEffect(() => {
-        if (!mapaListo || !capaUsuariosRef.current) return
+        if (!mapaListo || !capaUsuariosRef.current || !capaInfraRef.current) return
+
+        //--- puntos de infraestructura (Bocatoma, Ramal 1, Ramal 2) con su gráfica ---
+        const capaInfra = capaInfraRef.current
+        capaInfra.clearLayers()
+        PUNTOS.forEach((p) => {
+            const grafica = graficaSensorHTML(PUNTO_SENSOR[p.id])
+            L.marker([p.lat, p.lng], { icon: crearIcono(p.color) })
+                .addTo(capaInfra)
+                .bindPopup(`<strong>${p.nombre}</strong>${grafica}`, { minWidth: 220 })
+        })
+
+        //--- usuarios ---
         const capa = capaUsuariosRef.current
         capa.clearLayers()
-        usuarios.forEach((u) => {
+        const visibles = usuarios.filter((u) =>
+            filtroMapa === 'activos' ? u.esta_activo : filtroMapa === 'inactivos' ? !u.esta_activo : true)
+        visibles.forEach((u) => {
             const [lat, lng] = posicionUsuario(u)
             const nombre = (u.nombre || u.usuario || 'Usuario').trim()
             const estado = u.esta_activo ? 'Activo' : 'Inactivo'
@@ -168,17 +188,22 @@ export default function MapaUbicacion({ api, cabeceras, lecturas = [] }) {
                 .addTo(capa)
                 .bindPopup(`<strong>${nombre}</strong><br/>@${u.usuario}<br/>Estado: ${estado}${grafica}`, { minWidth: 220 })
         })
-    }, [usuarios, mapaListo, lecturas])
+    }, [usuarios, mapaListo, lecturas, filtroMapa])
 
     const activos = usuarios.filter((u) => u.esta_activo).length
     const inactivos = usuarios.length - activos
 
     return (
         <div className="panel panel-wide mapa-section">
-            <div className="panel-heading">
+            <div className="panel-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                 <div>
                     <p className="eyebrow">Ubicación</p>
                     <h2>Mapa del sistema — Vereda (simulado)</h2>
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                    <button className="btn-mini" type="button" onClick={() => setFiltroMapa('todos')} style={filtroMapa === 'todos' ? { background: '#176b87', color: '#fff', borderColor: '#176b87' } : {}}>Todos ({usuarios.length})</button>
+                    <button className="btn-mini" type="button" onClick={() => setFiltroMapa('activos')} style={filtroMapa === 'activos' ? { background: '#2e7d32', color: '#fff', borderColor: '#2e7d32' } : {}}>🟢 Activos ({activos})</button>
+                    <button className="btn-mini" type="button" onClick={() => setFiltroMapa('inactivos')} style={filtroMapa === 'inactivos' ? { background: '#c62828', color: '#fff', borderColor: '#c62828' } : {}}>🔴 Inactivos ({inactivos})</button>
                 </div>
             </div>
             <div className="mapa-contenedor" ref={contenedorRef} />
