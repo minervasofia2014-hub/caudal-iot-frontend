@@ -1,11 +1,39 @@
-import { useEffect, useMemo, useState } from 'react'
-import axios from 'axios'
-import MapaUbicacion from './MapaUbicacion'
-import './App.css'
+// ============================================================================
+//  App.jsx  —  COMPONENTE PRINCIPAL DEL PANEL DE MONITOREO HIDRÁULICO IoT
+// ----------------------------------------------------------------------------
+//  Aquí vive toda la aplicación web del acueducto veredal:
+//    · Autenticación (ingreso, registro, recuperar y cambiar contraseña)
+//    · Dashboard en tiempo real (gráficas por sensor y balance hídrico)
+//    · Control de electroválvulas (actuadores)
+//    · Historial de caudal y de reinicios
+//    · Administración de usuarios (solo para el administrador)
+//  El componente se comunica con el backend (Node/Express) por medio de la
+//  API REST usando la librería axios.
+// ============================================================================
 
+// Hooks de React:
+//   useEffect -> ejecuta código como reacción a cambios (efectos secundarios)
+//   useMemo   -> memoriza un valor para no recalcularlo en cada render
+//   useState  -> declara una variable de estado (dato que, al cambiar, redibuja)
+import { useEffect, useMemo, useState } from 'react'
+import axios from 'axios'                    // cliente HTTP para hablar con la API REST
+import MapaUbicacion from './MapaUbicacion'  // componente del mapa (Leaflet)
+import './App.css'                           // estilos propios de esta pantalla
+
+// --- CONSTANTES DE CONFIGURACIÓN --------------------------------------------
+
+// Dirección del backend. En producción la toma de la variable de entorno
+// VITE_API_URL (configurada en Render); si no existe, usa el servidor local.
 const URL_BACKEND = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
+// Cada cuántos milisegundos se vuelve a pedir el dashboard (3 s = casi vivo).
 const INTERVALO_REFRESCO = 3000
+
+// Nombre de la "gaveta" en el navegador (localStorage) donde se guarda la
+// credencial de sesión, para que al recargar la página el usuario siga dentro.
 const LLAVE_TOKEN = 'caudal_auth_token'
+
+// Traducción de los códigos de estado que envía el backend a texto legible.
 const TEXTOS_ESTADO = {
     seco: 'Seco',
     normal: 'Normal',
@@ -14,6 +42,9 @@ const TEXTOS_ESTADO = {
     desconectado: 'Desconectado',
 }
 
+// --- FUNCIONES AUXILIARES (helpers) -----------------------------------------
+
+// Convierte una fecha cruda (ISO del backend) a un formato colombiano legible.
 function formatearFecha(valor) {
     if (!valor) return 'Sin dato'
     const fecha = new Date(valor)
@@ -23,14 +54,23 @@ function formatearFecha(valor) {
     return new Intl.DateTimeFormat('es-CO', { dateStyle: 'short', timeStyle: 'medium' }).format(fecha)
 }
 
+// Convierte cualquier valor a número de forma segura. Si no es un número
+// válido devuelve 0, para que las gráficas y cálculos nunca fallen.
 function valorNumerico(valor) {
     const numero = Number(valor)
     return Number.isFinite(numero) ? numero : 0
 }
 
+// ============================================================================
+//  COMPONENTE: GraficaLinea
+//  Dibuja una mini-gráfica de líneas (SVG hecho a mano, sin librerías) con la
+//  serie de caudal de un sensor. Recibe los datos, el color y una etiqueta.
+// ============================================================================
 function GraficaLinea({ data, color = '#176b87', label }) {
     const ancho = 600, alto = 160, margen = 20
+    // Valor máximo de la serie (mínimo 1) para escalar la altura de la línea.
     const maximo = Math.max(...data.map((d) => d.value), 1)
+    // Convierte cada dato en una coordenada "x,y" dentro del lienzo SVG.
     const puntos = data.map((d, i) => {
         const x = margen + (i * (ancho - margen * 2)) / Math.max(data.length - 1, 1)
         const y = alto - margen - (d.value / maximo) * (alto - margen * 2)
@@ -40,8 +80,10 @@ function GraficaLinea({ data, color = '#176b87', label }) {
         <div className="sparkline-wrap">
             {label && <p className="sparkline-label">{label}</p>}
             <svg className="chart" viewBox={`0 0 ${ancho} ${alto}`} role="img">
+                {/* Ejes X e Y de la gráfica */}
                 <line x1={margen} x2={ancho - margen} y1={alto - margen} y2={alto - margen} stroke="#ccc" strokeWidth="1" />
                 <line x1={margen} x2={margen} y1={margen} y2={alto - margen} stroke="#ccc" strokeWidth="1" />
+                {/* Con 2 o más datos dibujamos la línea y los puntos */}
                 {data.length > 1 && (
                     <>
                         <polyline fill="none" points={puntos.join(' ')} stroke={color} strokeWidth="3" strokeLinejoin="round" />
@@ -60,6 +102,11 @@ function GraficaLinea({ data, color = '#176b87', label }) {
     )
 }
 
+// ============================================================================
+//  COMPONENTE: BarraBalance
+//  Muestra el BALANCE HÍDRICO: compara el agua que entra (bocatoma) con la que
+//  sale por los dos ramales, calcula la pérdida y decide si hay posible fuga.
+// ============================================================================
 function BarraBalance({ entrada, salida1, salida2, balance }) {
     // Si el backend ya manda el balance por ventana (volumen real acumulado), lo usamos.
     // Si no (backend viejo), caemos al caudal instantáneo como respaldo.
@@ -68,6 +115,7 @@ function BarraBalance({ entrada, salida1, salida2, balance }) {
     const sal1 = usaVentana ? valorNumerico(balance.salida1_prom) : valorNumerico(salida1)
     const sal2 = usaVentana ? valorNumerico(balance.salida2_prom) : valorNumerico(salida2)
 
+    // Pérdida = lo que entró menos lo que salió (nunca negativa).
     const totalSalida = sal1 + sal2
     const perdida = Math.max(0, ent - totalSalida)
 
@@ -78,6 +126,7 @@ function BarraBalance({ entrada, salida1, salida2, balance }) {
     const PISO_MLMIN = 40
     const hayFuga = ent > 0 && perdida > ent * TOLERANCIA_PCT && perdida > PISO_MLMIN
 
+    // Eficiencia = porcentaje del agua de entrada que efectivamente llegó a los ramales.
     const eficiencia = ent > 0 ? Math.min(100, (totalSalida / ent) * 100).toFixed(1) : 100
     const desc = usaVentana
         ? `Promedio de los últimos ${balance.ventana_min} min · calculado con el volumen real (total_mL) de cada sensor`
@@ -86,6 +135,7 @@ function BarraBalance({ entrada, salida1, salida2, balance }) {
         <div className="balance-section">
             <h2 className="balance-title">Balance Hídrico</h2>
             <p className="balance-desc">{desc}</p>
+            {/* Fórmula visual: Entrada = Ramal1 + Ramal2 (+ Pérdida si la hay) */}
             <div className="balance-formula">
                 <div className="balance-box entrada"><span className="balance-icon">💧</span><strong>{ent.toFixed(1)}</strong><small>mL/min entrada<br />(Sensor 1 · Bocatoma)</small></div>
                 <div className="balance-equals">=</div>
@@ -94,6 +144,7 @@ function BarraBalance({ entrada, salida1, salida2, balance }) {
                 <div className="balance-box salida"><span className="balance-icon">🔵</span><strong>{sal2.toFixed(1)}</strong><small>mL/min<br />(Sensor 3 · Ramal 2)</small></div>
                 {hayFuga && (<><div className="balance-plus">+</div><div className="balance-box fuga"><span className="balance-icon">⚠️</span><strong>{perdida.toFixed(1)}</strong><small>mL/min<br />Pérdida detectada</small></div></>)}
             </div>
+            {/* Barra proporcional: cada segmento ocupa el % del caudal de entrada */}
             <div className="balance-bar-wrap">
                 <div className="balance-bar">
                     {ent > 0 && (<>
@@ -108,6 +159,7 @@ function BarraBalance({ entrada, salida1, salida2, balance }) {
                     {hayFuga && <span><span className="dot perdida-dot" /> Pérdida</span>}
                 </div>
             </div>
+            {/* Mensaje final: verde si está balanceado, naranja si hay posible fuga */}
             <div className={`balance-status ${hayFuga ? 'fuga' : 'ok'}`}>
                 {hayFuga ? `⚠️ Posible fuga — Eficiencia: ${eficiencia}% — Pérdida: ${perdida.toFixed(1)} mL/min` : `✅ Sistema balanceado — Eficiencia: ${eficiencia}%`}
             </div>
@@ -115,10 +167,17 @@ function BarraBalance({ entrada, salida1, salida2, balance }) {
     )
 }
 
+// ============================================================================
+//  COMPONENTE: TarjetaSensor
+//  Tarjeta individual de un sensor: nombre, caudal actual, mini-gráfica y
+//  totales acumulados. Se usa una por cada uno de los 3 sensores.
+// ============================================================================
 function TarjetaSensor({ titulo, sensorId, ubicacion, color, lecturas }) {
+    // Filtra del listado general solo las lecturas de ESTE sensor.
     const datosSensor = lecturas.filter(r => r.sensor_id === sensorId)
-    const ultimo = datosSensor[0]
+    const ultimo = datosSensor[0]                                  // la más reciente
     const caudal = valorNumerico(ultimo?.caudal_entrada)
+    // Toma las últimas 20 lecturas y las invierte (viejo -> nuevo) para graficar.
     const serie = datosSensor.slice(0, 20).reverse().map(r => ({ label: formatearFecha(r.fecha), value: valorNumerico(r.caudal_entrada) }))
     return (
         <article className="sensor-card">
@@ -135,8 +194,14 @@ function TarjetaSensor({ titulo, sensorId, ubicacion, color, lecturas }) {
     )
 }
 
+// ============================================================================
+//  COMPONENTE: ChipEstado
+//  Pastilla que indica si el comando enviado a una electroválvula ya fue
+//  confirmado físicamente por el ESP32 (estado real == estado solicitado).
+// ============================================================================
 function ChipEstado({ actuador }) {
     if (!actuador) return <span className="actuador-chip actuador-pendiente">Sin datos aún</span>
+    // Está sincronizado cuando lo que se pidió coincide con lo que reportó el hardware.
     const sincronizado = actuador.estado_solicitado ? actuador.estado_solicitado === actuador.estado_real : true
     return (
         <span className={`actuador-chip ${sincronizado ? 'actuador-ok' : 'actuador-pendiente'}`}>
@@ -145,19 +210,27 @@ function ChipEstado({ actuador }) {
     )
 }
 
+// ============================================================================
+//  COMPONENTE: PanelUsuarios  (solo administrador)
+//  Tabla para gestionar cuentas: aprobar, activar/desactivar, dar/quitar rol
+//  de administrador y asignar ubicación (lat/lng) + punto de la vereda.
+// ============================================================================
 function PanelUsuarios({ api, cabeceras }) {
+    // --- Estados locales del panel ---
     const [usuarios, setUsuarios] = useState([])
     const [cargando, setCargando] = useState(true)
     const [error, setError] = useState('')
-    const [ocupado, setOcupado] = useState(null)
-    const [coords, setCoords] = useState({}) // edición de lat/lng por usuario
-    const [filtro, setFiltro] = useState('todos') // todos | activos | inactivos
+    const [ocupado, setOcupado] = useState(null)     // id del usuario que se está guardando
+    const [coords, setCoords] = useState({})         // edición de lat/lng por usuario
+    const [filtro, setFiltro] = useState('todos')    // todos | activos | inactivos
 
+    // Pide al backend la lista completa de usuarios.
     async function cargarUsuarios() {
         try { const { data } = await api.get('/api/usuarios', { headers: cabeceras }); setUsuarios(data); setError('') }
         catch { setError('No fue posible cargar los usuarios.') }
         finally { setCargando(false) }
     }
+    // Se ejecuta una sola vez, al montar el panel.
     useEffect(() => { cargarUsuarios() }, [])
 
     // valor mostrado en cada casilla: lo que el admin está escribiendo, o lo guardado
@@ -166,9 +239,11 @@ function PanelUsuarios({ api, cabeceras }) {
         const v = campo === 'lat' ? u.latitud : u.longitud
         return v === null || v === undefined ? '' : v
     }
+    // Guarda temporalmente lo que el admin escribe antes de enviarlo.
     const editarCoord = (id, campo, valor) => {
         setCoords((c) => ({ ...c, [id]: { ...c[id], [campo]: valor } }))
     }
+    // Envía al backend la ubicación y el sensor asignado a un usuario.
     async function guardarCoords(u) {
         setOcupado(u._id)
         try {
@@ -176,33 +251,38 @@ function PanelUsuarios({ api, cabeceras }) {
             const longitud = valorCoord(u, 'lng')
             const sensor_asociado = coords[u._id]?.sensor !== undefined ? coords[u._id].sensor : (u.sensor_asociado || '')
             await api.put(`/api/usuarios/${u._id}`, { ...u, latitud, longitud, sensor_asociado }, { headers: cabeceras })
-            setCoords((c) => { const n = { ...c }; delete n[u._id]; return n })
-            await cargarUsuarios()
+            setCoords((c) => { const n = { ...c }; delete n[u._id]; return n })   // limpia el borrador
+            await cargarUsuarios()                                                // recarga la tabla
         } catch { alert('No fue posible guardar los datos del usuario') }
         finally { setOcupado(null) }
     }
 
+    // Aprueba una cuenta pendiente.
     async function aprobar(id) {
         setOcupado(id)
         try { await api.patch(`/api/usuarios/${id}/aprobar`, null, { headers: cabeceras }); await cargarUsuarios() }
         catch { alert('No fue posible aprobar el usuario') }
         finally { setOcupado(null) }
     }
+    // Alterna el rol de administrador.
     async function cambiarRol(u) {
         setOcupado(u._id)
         try { await api.put(`/api/usuarios/${u._id}`, { ...u, es_administrador: !u.es_administrador }, { headers: cabeceras }); await cargarUsuarios() }
         catch { alert('No fue posible actualizar el usuario') }
         finally { setOcupado(null) }
     }
+    // Alterna activo/inactivo (sustituye al antiguo botón "eliminar").
     async function alternarActivo(u) {
         setOcupado(u._id)
         try { await api.put(`/api/usuarios/${u._id}`, { ...u, esta_activo: !u.esta_activo }, { headers: cabeceras }); await cargarUsuarios() }
         catch { alert('No fue posible cambiar el estado del usuario') }
         finally { setOcupado(null) }
     }
+    // Conteos para las etiquetas de los botones de filtro.
     const total = usuarios.length
     const nActivos = usuarios.filter(u => u.esta_activo).length
     const nInactivos = total - nActivos
+    // Aplica el filtro seleccionado sobre la lista.
     const usuariosFiltrados = usuarios.filter(u =>
         filtro === 'activos' ? u.esta_activo : filtro === 'inactivos' ? !u.esta_activo : true)
 
@@ -211,6 +291,7 @@ function PanelUsuarios({ api, cabeceras }) {
         <section className="panel panel-wide historial-section">
             <div className="panel-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                 <div><p className="eyebrow">Administración</p><h2>Usuarios registrados</h2></div>
+                {/* Botones de filtro: Todos / Activos / Inactivos */}
                 <div style={{ display: 'flex', gap: 6 }}>
                     <button className="btn-mini" type="button" onClick={() => setFiltro('todos')} style={filtro === 'todos' ? { background: '#176b87', color: '#fff', borderColor: '#176b87' } : {}}>Todos ({total})</button>
                     <button className="btn-mini" type="button" onClick={() => setFiltro('activos')} style={filtro === 'activos' ? { background: '#2e7d32', color: '#fff', borderColor: '#2e7d32' } : {}}>🟢 Activos ({nActivos})</button>
@@ -222,6 +303,7 @@ function PanelUsuarios({ api, cabeceras }) {
                 <table>
                     <thead><tr><th>Usuario</th><th>Nombre</th><th>Correo</th><th>Estado</th><th>Rol</th><th>Ubicación (lat, lng) y punto</th><th>Acciones</th></tr></thead>
                     <tbody>
+                        {/* Una fila por cada usuario que pase el filtro */}
                         {usuariosFiltrados.map((u) => (
                             <tr key={u._id}>
                                 <td>{u.usuario}</td>
@@ -229,6 +311,7 @@ function PanelUsuarios({ api, cabeceras }) {
                                 <td>{u.correo_electronico}</td>
                                 <td><span className={`table-status ${u.esta_activo ? 'status-normal' : 'status-desconectado'}`}>{u.esta_activo ? 'Aprobado' : 'Pendiente'}</span></td>
                                 <td>{u.es_administrador ? '👑 Admin' : 'Usuario'}</td>
+                                {/* Edición de coordenadas y punto de la vereda */}
                                 <td className="admin-actions">
                                     <input type="number" step="any" placeholder="lat" value={valorCoord(u, 'lat')} onChange={(e) => editarCoord(u._id, 'lat', e.target.value)} style={{ width: 90 }} />
                                     <input type="number" step="any" placeholder="lng" value={valorCoord(u, 'lng')} onChange={(e) => editarCoord(u._id, 'lng', e.target.value)} style={{ width: 90 }} />
@@ -240,6 +323,7 @@ function PanelUsuarios({ api, cabeceras }) {
                                     </select>
                                     <button className="btn-mini" disabled={ocupado === u._id} onClick={() => guardarCoords(u)} type="button">📍 Guardar</button>
                                 </td>
+                                {/* Acciones: aprobar, activar/desactivar y cambiar rol */}
                                 <td className="admin-actions">
                                     {!u.esta_activo && <button className="btn-mini btn-mini-aprobar" disabled={ocupado === u._id} onClick={() => aprobar(u._id)} type="button">Aprobar</button>}
                                     <button className="btn-mini" disabled={ocupado === u._id} onClick={() => alternarActivo(u)} type="button" style={{ background: u.esta_activo ? '#e8f5e9' : '#fdecea', color: u.esta_activo ? '#2e7d32' : '#c62828', borderColor: u.esta_activo ? '#2e7d32' : '#c62828' }}>{u.esta_activo ? '🟢 Activo' : '🔴 Inactivo'}</button>
@@ -247,6 +331,7 @@ function PanelUsuarios({ api, cabeceras }) {
                                 </td>
                             </tr>
                         ))}
+                        {/* Mensaje cuando el filtro no arroja resultados */}
                         {usuariosFiltrados.length === 0 && <tr><td colSpan="7" style={{ textAlign: 'center', color: '#aaa' }}>Sin usuarios en este filtro</td></tr>}
                     </tbody>
                 </table>
@@ -255,26 +340,33 @@ function PanelUsuarios({ api, cabeceras }) {
     )
 }
 
+// ============================================================================
+//  COMPONENTE: HistorialReinicios
+//  Dos vistas en una:
+//    · "Caudal (promedios)": historial archivado por día/semana/mes y sensor.
+//    · "Reinicios": registro de cada vez que se pusieron los contadores en 0.
+// ============================================================================
 function HistorialReinicios({ api, cabeceras }) {
-    const [vista, setVista] = useState('caudal') // caudal | reinicios
-    const [rango, setRango] = useState('semanal') // semanal | mensual
+    const [vista, setVista] = useState('caudal')          // caudal | reinicios
+    const [rango, setRango] = useState('semanal')         // semanal | mensual | diario
     const [sensorFiltro, setSensorFiltro] = useState('todos') // todos | sensor_01/02/03
     const [caudal, setCaudal] = useState([])
     const [reinicios, setReinicios] = useState([])
 
-    // historial de caudal (promedios) según el rango elegido
+    // historial de caudal (promedios) según el rango elegido.
+    // Se recarga solo cada 30 s y también cuando cambia el rango.
     useEffect(() => {
-        let vivo = true
+        let vivo = true    // bandera para no actualizar si el componente se desmontó
         async function cargar() {
             try { const { data } = await api.get(`/api/v1/historial/?rango=${rango}`, { headers: cabeceras }); if (vivo) setCaudal(data?.datos || []) }
             catch { if (vivo) setCaudal([]) }
         }
         cargar()
         const id = setInterval(cargar, 30000)
-        return () => { vivo = false; clearInterval(id) }
+        return () => { vivo = false; clearInterval(id) }   // limpieza al desmontar
     }, [api, cabeceras, rango])
 
-    // historial de reinicios
+    // historial de reinicios (se recarga cada 30 s).
     useEffect(() => {
         let vivo = true
         async function cargar() {
@@ -286,20 +378,24 @@ function HistorialReinicios({ api, cabeceras }) {
         return () => { vivo = false; clearInterval(id) }
     }, [api, cabeceras])
 
+    // Traduce el id técnico del sensor a su nombre en la vereda.
     const nombrePunto = (s) => s === 'sensor_01' ? 'Bocatoma' : s === 'sensor_02' ? 'Ramal 1' : s === 'sensor_03' ? 'Ramal 2' : s
 
     return (
         <div className="panel panel-wide" style={{ marginTop: 16 }}>
             <div className="panel-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                 <div><p className="eyebrow">Historial</p><h2>Registros del sistema</h2></div>
+                {/* Cambia entre la vista de caudal y la de reinicios */}
                 <div style={{ display: 'flex', gap: 6 }}>
                     <button className="btn-mini" type="button" onClick={() => setVista('caudal')} style={vista === 'caudal' ? { background: '#176b87', color: '#fff', borderColor: '#176b87' } : {}}>Caudal (promedios)</button>
                     <button className="btn-mini" type="button" onClick={() => setVista('reinicios')} style={vista === 'reinicios' ? { background: '#b8860b', color: '#fff', borderColor: '#b8860b' } : {}}>Reinicios</button>
                 </div>
             </div>
 
+            {/* ----- VISTA 1: promedios de caudal ----- */}
             {vista === 'caudal' && (
                 <>
+                    {/* Filtros de periodo (día/semana/mes) y de sensor */}
                     <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                         <button className="btn-mini" type="button" onClick={() => setRango('diario')} style={rango === 'diario' ? { background: '#2a9d8f', color: '#fff', borderColor: '#2a9d8f' } : {}}>Por día</button>
                         <button className="btn-mini" type="button" onClick={() => setRango('semanal')} style={rango === 'semanal' ? { background: '#2a9d8f', color: '#fff', borderColor: '#2a9d8f' } : {}}>Por semana</button>
@@ -314,6 +410,7 @@ function HistorialReinicios({ api, cabeceras }) {
                         <table>
                             <thead><tr><th>{rango === 'mensual' ? 'Mes' : rango === 'diario' ? 'Día' : 'Semana'}</th><th>Punto</th><th>Caudal promedio (mL/min)</th><th>Bloques</th></tr></thead>
                             <tbody>
+                                {/* Filas de promedios, aplicando el filtro por sensor */}
                                 {caudal.filter(d => sensorFiltro === 'todos' || d.sensor_id === sensorFiltro).map((d, i) => (
                                     <tr key={i}>
                                         <td>{d.periodo}</td>
@@ -329,6 +426,7 @@ function HistorialReinicios({ api, cabeceras }) {
                 </>
             )}
 
+            {/* ----- VISTA 2: historial de reinicios ----- */}
             {vista === 'reinicios' && (
                 <div className="table-wrap">
                     <table style={{ borderCollapse: 'collapse', width: '100%' }}>
@@ -343,6 +441,7 @@ function HistorialReinicios({ api, cabeceras }) {
                             </tr>
                         </thead>
                         <tbody>
+                            {/* Cada fila = un reinicio, con el total acumulado que tenía cada sensor */}
                             {reinicios.map((r, i) => (
                                 <tr key={i} style={{ background: i % 2 === 0 ? '#f7fafb' : '#ffffff', borderBottom: '1px solid #e6ecee' }}>
                                     <td style={{ padding: '9px 12px', color: '#888' }}>{i + 1}</td>
@@ -362,11 +461,20 @@ function HistorialReinicios({ api, cabeceras }) {
     )
 }
 
+// ============================================================================
+//  COMPONENTE PRINCIPAL: App
+//  Orquesta toda la aplicación: maneja la sesión, decide qué pantalla mostrar
+//  (login o dashboard) y trae los datos del backend en tiempo real.
+// ============================================================================
 function App() {
+    // --- Estado de la sesión ---
+    // Recupera la credencial guardada en el navegador (si existe) al iniciar.
     const [tokenSesion, setTokenSesion] = useState(() => window.localStorage.getItem(LLAVE_TOKEN))
     const [usuarioActual, setUsuarioActual] = useState(null)
     const [verificandoSesion, setVerificandoSesion] = useState(Boolean(tokenSesion))
-    const [modoAuth, setModoAuth] = useState('login')
+
+    // --- Estado de los formularios de autenticación ---
+    const [modoAuth, setModoAuth] = useState('login')  // login | register | recuperar
     const [formLogin, setFormLogin] = useState({ usuario: '', contraseña: '' })
     const [errorLogin, setErrorLogin] = useState('')
     const [cargandoLogin, setCargandoLogin] = useState(false)
@@ -382,17 +490,23 @@ function App() {
     const [formCambiarClave, setFormCambiarClave] = useState({ contraseña_actual: '', nueva_contraseña: '' })
     const [errorCambiarClave, setErrorCambiarClave] = useState('')
     const [exitoCambiarClave, setExitoCambiarClave] = useState('')
-    const [dashboard, setDashboard] = useState(null)
+
+    // --- Estado del dashboard ---
+    const [dashboard, setDashboard] = useState(null)   // datos que llegan del backend
     const [error, setError] = useState('')
     const [cargando, setCargando] = useState(true)
-    const [vista, setVista] = useState('dashboard')
+    const [vista, setVista] = useState('dashboard')     // dashboard | usuarios
     const [filtroSensor, setFiltroSensor] = useState('todos')
     const [paginaActual, setPaginaActual] = useState(1)
     const FILAS_POR_PAGINA = 10
 
+    // Cliente axios memorizado (se crea una sola vez) apuntando al backend.
     const api = useMemo(() => axios.create({ baseURL: URL_BACKEND }), [])
+    // Cabecera de autorización con la credencial de sesión; se recalcula si cambia.
     const cabeceras = useMemo(() => (tokenSesion ? { Authorization: `Token ${tokenSesion}` } : {}), [tokenSesion])
 
+    // EFECTO 1: al arrancar (o si cambia la credencial), valida la sesión contra
+    // el backend. Si la credencial ya no sirve, la borra y saca al usuario al login.
     useEffect(() => {
         let activo = true
         async function validarSesion() {
@@ -411,6 +525,9 @@ function App() {
         return () => { activo = false }
     }, [api, cabeceras, tokenSesion])
 
+    // EFECTO 2: mientras haya sesión válida, pide el dashboard cada 3 segundos
+    // (INTERVALO_REFRESCO) para mantener las gráficas casi en vivo. Si el servidor
+    // responde 401/403 (sesión vencida), cierra sesión automáticamente.
     useEffect(() => {
         if (!tokenSesion || !usuarioActual) return undefined
         let activo = true
@@ -433,6 +550,9 @@ function App() {
         return () => { activo = false; window.clearInterval(timer) }
     }, [api, cabeceras, tokenSesion, usuarioActual])
 
+    // --- ACCIONES DE AUTENTICACIÓN ---
+
+    // Inicia sesión: envía usuario/contraseña, guarda la credencial y entra al panel.
     async function manejarLogin(e) {
         e.preventDefault(); setErrorLogin(''); setCargandoLogin(true)
         try {
@@ -444,6 +564,7 @@ function App() {
         finally { setCargandoLogin(false) }
     }
 
+    // Registra una cuenta nueva (queda pendiente hasta que un admin la apruebe).
     async function manejarRegistro(e) {
         e.preventDefault(); setErrorRegistro(''); setExitoRegistro(''); setCargandoRegistro(true)
         try {
@@ -455,6 +576,7 @@ function App() {
         finally { setCargandoRegistro(false) }
     }
 
+    // Recupera contraseña validando usuario + correo y fijando una nueva clave.
     async function manejarRecuperar(e) {
         e.preventDefault(); setErrorRecuperar(''); setExitoRecuperar(''); setCargandoRecuperar(true)
         try {
@@ -466,6 +588,7 @@ function App() {
         finally { setCargandoRecuperar(false) }
     }
 
+    // Cambia la contraseña estando ya dentro (requiere la contraseña actual).
     async function manejarCambiarClave(e) {
         e.preventDefault(); setErrorCambiarClave(''); setExitoCambiarClave('')
         try {
@@ -476,6 +599,7 @@ function App() {
         } catch (err) { setErrorCambiarClave(err.response?.data?.detail || 'No fue posible cambiar la contraseña') }
     }
 
+    // Cierra sesión: avisa al backend y limpia toda la información local.
     async function cerrarSesion() {
         try { if (tokenSesion) await api.post('/api/auth/logout/', null, { headers: cabeceras }) } catch {}
         finally {
@@ -485,11 +609,13 @@ function App() {
         }
     }
 
+    // Envía un comando de abrir/cerrar a una electroválvula (viaja por MQTT al ESP32).
     async function controlarValvula(sensor, accion) {
         try { await api.post('/api/v1/valvula/', { sensor, accion }, { headers: cabeceras }) }
         catch { alert('❌ Error al enviar comando') }
     }
 
+    // Reinicia los contadores de los 3 sensores a 0 (guardando antes un histórico).
     async function reiniciarSistema() {
         if (!window.confirm('¿Reiniciar los contadores de los 3 sensores a 0?\nSe guardará un registro histórico y se borrará el historial de mediciones. Esta acción no se puede deshacer.')) return
         try {
@@ -500,10 +626,14 @@ function App() {
         } catch { alert('No fue posible reiniciar el sistema.') }
     }
 
+    // --- RENDERIZADO CONDICIONAL ---
+
+    // 1) Mientras se verifica la credencial guardada, mostramos una pantalla de espera.
     if (verificandoSesion) {
         return (<main className="auth-page"><section className="auth-panel"><p className="eyebrow">Acueducto veredal</p><h1>Validando acceso</h1><p>Comprobando tu sesión...</p></section></main>)
     }
 
+    // 2) Si NO hay sesión, mostramos la pantalla de autenticación (login/registro/recuperar).
     if (!tokenSesion || !usuarioActual) {
         return (
             <main className="auth-page">
@@ -511,11 +641,13 @@ function App() {
                     <p className="eyebrow">Acueducto veredal</p>
                     <h1>{modoAuth === 'login' ? 'Ingreso administrativo' : modoAuth === 'register' ? 'Crear cuenta' : 'Recuperar contraseña'}</h1>
                     <p>{modoAuth === 'login' ? 'Inicia sesión con una cuenta aprobada para ver el dashboard.' : modoAuth === 'register' ? 'Solicita una cuenta. Un administrador debe aprobarla.' : 'Ingresa tu usuario y correo electrónico para restablecer tu contraseña.'}</p>
+                    {/* Pestañas para alternar entre los tres formularios */}
                     <div className="auth-switch" role="tablist">
                         <button className={modoAuth === 'login' ? 'active' : ''} onClick={() => { setModoAuth('login'); setErrorLogin('') }} role="tab" type="button">Ingresar</button>
                         <button className={modoAuth === 'register' ? 'active' : ''} onClick={() => { setModoAuth('register'); setErrorRegistro(''); setExitoRegistro('') }} role="tab" type="button">Crear cuenta</button>
                         <button className={modoAuth === 'recuperar' ? 'active' : ''} onClick={() => { setModoAuth('recuperar'); setErrorRecuperar(''); setExitoRecuperar('') }} role="tab" type="button">Recuperar</button>
                     </div>
+                    {/* Formulario de INGRESO */}
                     {modoAuth === 'login' ? (
                         <form className="login-form" onSubmit={manejarLogin}>
                             <label>Usuario<input autoComplete="username" onChange={e => setFormLogin(c => ({ ...c, usuario: e.target.value }))} required type="text" value={formLogin.usuario} /></label>
@@ -526,6 +658,7 @@ function App() {
                             <button disabled={cargandoLogin} type="submit">{cargandoLogin ? 'Ingresando...' : 'Ingresar'}</button>
                         </form>
                     ) : modoAuth === 'register' ? (
+                        /* Formulario de REGISTRO */
                         <form className="login-form" onSubmit={manejarRegistro}>
                             <label>Usuario<input onChange={e => setFormRegistro(c => ({ ...c, usuario: e.target.value }))} required type="text" value={formRegistro.usuario} /></label>
                             <label>Correo<input onChange={e => setFormRegistro(c => ({ ...c, correo_electronico: e.target.value }))} type="email" value={formRegistro.correo_electronico} /></label>
@@ -538,6 +671,7 @@ function App() {
                             <button disabled={cargandoRegistro} type="submit">{cargandoRegistro ? 'Creando...' : 'Crear cuenta'}</button>
                         </form>
                     ) : modoAuth === 'recuperar' ? (
+                        /* Formulario de RECUPERACIÓN */
                         <form className="login-form" onSubmit={manejarRecuperar}>
                             <label>Usuario<input onChange={e => setFormRecuperar(c => ({ ...c, usuario: e.target.value }))} required type="text" value={formRecuperar.usuario} /></label>
                             <label>Correo electrónico<input onChange={e => setFormRecuperar(c => ({ ...c, correo_electronico: e.target.value }))} required type="email" value={formRecuperar.correo_electronico} /></label>
@@ -552,11 +686,13 @@ function App() {
         )
     }
 
-    const lecturas = dashboard?.recent_readings || []
-    const estado = dashboard?.latest?.estado || 'desconectado'
-    const alerta = dashboard?.latest?.alerta
+    // 3) Con sesión válida: preparamos los datos del dashboard antes de dibujarlo.
+    const lecturas = dashboard?.recent_readings || []           // últimas lecturas de los sensores
+    const estado = dashboard?.latest?.estado || 'desconectado'  // estado general del sistema
+    const alerta = dashboard?.latest?.alerta                    // mensaje de alerta, si hay
     const actuadores = dashboard?.actuadores || []
     const buscarActuador = (id) => actuadores.find(a => a.nombre_actuador === id)
+    // Separamos la última lectura de cada sensor para el balance hídrico.
     const s1 = lecturas.find(r => r.sensor_id === 'sensor_01')
     const s2 = lecturas.find(r => r.sensor_id === 'sensor_02')
     const s3 = lecturas.find(r => r.sensor_id === 'sensor_03')
@@ -564,6 +700,7 @@ function App() {
     const salida1 = valorNumerico(s2?.caudal_entrada)
     const salida2 = valorNumerico(s3?.caudal_entrada)
     const NOMBRES_SENSOR = { sensor_01: 'Bocatoma', sensor_02: 'Ramal 1', sensor_03: 'Ramal 2' }
+    // Filtrado y paginación de la tabla de "Lecturas recientes".
     const lecturasFiltradas = filtroSensor === 'todos' ? lecturas : lecturas.filter((r) => r.sensor_id === filtroSensor)
     const totalPaginas = Math.max(1, Math.ceil(lecturasFiltradas.length / FILAS_POR_PAGINA))
     const paginaSegura = Math.min(paginaActual, totalPaginas)
@@ -571,8 +708,10 @@ function App() {
     const lecturasPagina = lecturasFiltradas.slice(inicioPagina, inicioPagina + FILAS_POR_PAGINA)
     function cambiarFiltro(valor) { setFiltroSensor(valor); setPaginaActual(1) }
 
+    // --- PANTALLA DEL DASHBOARD ---
     return (
         <main className="dashboard-page">
+            {/* Cabecera: título, estado, usuario y botones globales */}
             <header className="dashboard-header">
                 <div>
                     <p className="eyebrow">Acueducto veredal</p>
@@ -582,6 +721,7 @@ function App() {
                 <div className="header-actions">
                     <div className={`status-pill status-${estado}`}><span />{TEXTOS_ESTADO[estado] || estado}</div>
                     <span className="user-badge">{usuarioActual.es_administrador ? '👑 Admin' : '👤 ' + usuarioActual.usuario}</span>
+                    {/* El botón de reiniciar solo lo ve el administrador */}
                     {usuarioActual.es_administrador && (
                         <button className="logout-button" onClick={reiniciarSistema} type="button" style={{ background: '#c0392b', color: '#fff', borderColor: '#c0392b' }}>Reiniciar</button>
                     )}
@@ -590,6 +730,7 @@ function App() {
                 </div>
             </header>
 
+            {/* Selector Dashboard/Usuarios (solo administrador) */}
             {usuarioActual.es_administrador && (
                 <div className="auth-switch vista-switch" role="tablist" style={{ marginBottom: 24 }}>
                     <button className={vista === 'dashboard' ? 'active' : ''} onClick={() => setVista('dashboard')} role="tab" type="button">Dashboard</button>
@@ -597,9 +738,11 @@ function App() {
                 </div>
             )}
 
+            {/* Banners de error del servidor y de alerta del sistema */}
             {error && <section className="alert-banner">{error}</section>}
             {alerta && <section className="alert-banner">{alerta}</section>}
 
+            {/* Formulario emergente para cambiar contraseña */}
             {mostrarCambiarClave && (
                 <section className="panel panel-wide" style={{ marginBottom: 24, padding: 24 }}>
                     <h2>Cambiar contraseña</h2>
@@ -613,10 +756,12 @@ function App() {
                 </section>
             )}
 
+            {/* Si el admin eligió "Usuarios" mostramos ese panel; si no, el dashboard */}
             {vista === 'usuarios' && usuarioActual.es_administrador ? (
                 <PanelUsuarios api={api} cabeceras={cabeceras} />
             ) : (
                 <>
+                    {/* Gráficas en tiempo real, una por sensor */}
                     <section className="sensors-section">
                         <h2 className="section-title">Gráficas por sensor</h2>
                         <div className="sensors-grid">
@@ -626,12 +771,15 @@ function App() {
                         </div>
                     </section>
 
+                    {/* Módulo de balance hídrico */}
                     <section className="balance-wrap">
                         <BarraBalance entrada={entrada} salida1={salida1} salida2={salida2} balance={dashboard?.balance} />
                     </section>
 
+                    {/* Mapa de la vereda con la ubicación de los usuarios */}
                     <MapaUbicacion api={api} cabeceras={cabeceras} lecturas={lecturas} />
 
+                    {/* Control manual de las 3 electroválvulas */}
                     <section className="valvulas-section">
                         <h2 className="section-title">Control de electroválvulas</h2>
                         <div className="valvulas-grid">
@@ -649,8 +797,10 @@ function App() {
                         </div>
                     </section>
 
+                    {/* Historial de promedios y de reinicios */}
                     <HistorialReinicios api={api} cabeceras={cabeceras} />
 
+                    {/* Tabla paginada de las lecturas más recientes */}
                     <section className="panel panel-wide historial-section">
                         <div className="panel-heading">
                             <div><p className="eyebrow">Historial</p><h2>Lecturas recientes</h2></div>
@@ -685,6 +835,7 @@ function App() {
                                 </tbody>
                             </table>
                         </div>
+                        {/* Controles de paginación */}
                         <div className="historial-paginador">
                             <button disabled={paginaSegura <= 1} onClick={() => setPaginaActual(1)} type="button">« Primera</button>
                             <button disabled={paginaSegura <= 1} onClick={() => setPaginaActual(p => Math.max(1, p - 1))} type="button">‹ Anterior</button>

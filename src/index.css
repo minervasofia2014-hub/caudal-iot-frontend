@@ -1,24 +1,39 @@
+/* ==========================================================================
+   index.css  —  HOJA DE ESTILOS BASE DE LA APLICACIÓN
+   --------------------------------------------------------------------------
+   Define la apariencia de toda la interfaz: login, dashboard, tarjetas de
+   sensores, balance hídrico, electroválvulas, historial, mapa y filtros.
+   Paleta principal: azul #176b87 (marca), verde para "activo/ok" y rojo
+   para "inactivo/alerta".
+   ========================================================================== */
+
+/* ==========================================================================
+   LOGIN / AUTENTICACIÓN
+   ========================================================================== */
+
+/* Contenedor de pantalla completa que centra la tarjeta de acceso */
 .auth-page {
   display: grid;
-  min-height: 100svh;
+  min-height: 100svh;         /* alto de la ventana (svh = seguro en móviles) */
   box-sizing: border-box;
-  place-items: center;
+  place-items: center;        /* centra la tarjeta vertical y horizontalmente */
   padding: 24px;
   color: #172321;
-  background:
+  background:                 /* dos gradientes suaves sobre un fondo claro */
     linear-gradient(135deg, rgba(23, 107, 135, 0.1), transparent 34%),
     linear-gradient(315deg, rgba(172, 138, 65, 0.14), transparent 38%),
     #f5f8f7;
 }
 
+/* Tarjeta flotante del formulario de acceso */
 .auth-panel {
-  width: min(100%, 580px);
+  width: min(100%, 580px);    /* responsive: máximo 580px de ancho */
   box-sizing: border-box;
   border: 1px solid #dce7e4;
   border-radius: 8px;
   padding: 28px;
   background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 16px 36px rgba(24, 43, 40, 0.08);
+  box-shadow: 0 16px 36px rgba(24, 43, 40, 0.08);  /* sombra de elevación */
 }
 
 .auth-panel h1 {
@@ -31,9 +46,10 @@
 
 .auth-panel p {
   margin: 10px 0 0;
-  color: #526663;
+  color: #526663;             /* gris secundario */
 }
 
+/* Selector de pestañas (Ingresar / Crear cuenta / Recuperar) */
 .auth-switch {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -56,11 +72,13 @@
   cursor: pointer;
 }
 
+/* Pestaña activa resaltada en azul de marca */
 .auth-switch button.active {
   color: #fff;
   background: #176b87;
 }
 
+/* Estructura del formulario */
 .login-form {
   display: grid;
   gap: 14px;
@@ -77,7 +95,7 @@
 .login-form input {
   box-sizing: border-box;
   width: 100%;
-  min-height: 44px;
+  min-height: 44px;           /* altura cómoda para pantallas táctiles */
   border: 1px solid #cddbd8;
   border-radius: 6px;
   padding: 0 12px;
@@ -86,17 +104,20 @@
   font: inherit;
 }
 
+/* Aro de enfoque accesible al seleccionar un campo */
 .login-form input:focus {
   border-color: #176b87;
   outline: 3px solid rgba(23, 107, 135, 0.16);
 }
 
+/* Fila con dos campos (Nombre / Apellido) */
 .form-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
+/* Botones de envío y de cierre de sesión */
 .login-form button,
 .logout-button {
   min-height: 40px;
@@ -110,11 +131,13 @@
   cursor: pointer;
 }
 
+/* Botón deshabilitado mientras se procesa la petición */
 .login-form button:disabled {
   cursor: wait;
   opacity: 0.7;
 }
 
+/* Mensaje verde de acción exitosa */
 .success-banner {
   margin-bottom: 4px;
   border: 1px solid #a9d8bf;
@@ -125,10 +148,15 @@
   font-weight: 700;
 }
 
+/* ==========================================================================
+   DASHBOARD / PANEL PRINCIPAL
+   ========================================================================== */
+
+/* Fondo y espaciado general del panel */
 .dashboard-page {
   min-height: 100svh;
   box-sizing: border-box;
-  padding: 28px clamp(16px, 4vw, 48px);
+  padding: 28px clamp(16px, 4vw, 48px);   /* padding lateral fluido */
   color: #172321;
   background:
     linear-gradient(135deg, rgba(23, 107, 135, 0.08), transparent 32%),
@@ -136,6 +164,7 @@
     #f5f8f7;
 }
 
+/* Cabecera: título a la izquierda, acciones a la derecha */
 .dashboard-header {
   display: flex;
   align-items: flex-start;
@@ -146,7 +175,7 @@
 
 .dashboard-header h1 {
   margin: 0;
-  font-size: clamp(2rem, 4vw, 3.5rem);
+  font-size: clamp(2rem, 4vw, 3.5rem);    /* tamaño de título adaptable */
   line-height: 1.05;
   letter-spacing: 0;
 }
@@ -163,10 +192,12 @@
   gap: 10px;
 }
 
+/* Color distinto para el botón de salir */
 .logout-button {
   background: #314743;
 }
 
+/* Etiqueta pequeña en mayúsculas (categoría) */
 .eyebrow {
   margin: 0 0 8px;
   color: #176b87;
@@ -176,6 +207,7 @@
   text-transform: uppercase;
 }
 
+/* Cápsulas de estado (pill) del sistema y de las tablas */
 .status-pill,
 .table-status {
   display: inline-flex;
@@ -189,6 +221,7 @@
   white-space: nowrap;
 }
 
+/* Puntico de color dentro de la cápsula */
 .status-pill span {
   width: 10px;
   height: 10px;
@@ -196,11 +229,13 @@
   background: currentColor;
 }
 
+/* Estado normal = verde */
 .status-normal {
   color: #176046;
   background: #e8f6ef;
 }
 
+/* Estados problemáticos = rojo */
 .status-seco,
 .status-exceso,
 .status-error,
@@ -209,6 +244,7 @@
   background: #fff0f0;
 }
 
+/* Banner de alerta destacado */
 .alert-banner {
   margin-bottom: 18px;
   border: 1px solid #f0b7b7;
@@ -219,22 +255,26 @@
   font-weight: 700;
 }
 
+/* Rejillas del dashboard */
 .metric-grid,
 .dashboard-grid {
   display: grid;
   gap: 16px;
 }
 
+/* Fila de KPIs en 4 columnas */
 .metric-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   margin-bottom: 16px;
 }
 
+/* Distribución principal: columna ancha + columna angosta */
 .dashboard-grid {
   grid-template-columns: 1.4fr 0.8fr;
   align-items: start;
 }
 
+/* Tarjetas y paneles con borde, sombra y fondo semitransparente */
 .stat-card,
 .panel {
   border: 1px solid #dce7e4;
@@ -258,6 +298,7 @@
   color: #5d6f6c;
 }
 
+/* Número principal de cada métrica */
 .stat-card strong {
   font-size: clamp(1.35rem, 2.5vw, 2rem);
   line-height: 1.1;
@@ -271,6 +312,7 @@
   grid-column: span 1;
 }
 
+/* Encabezado interno de un panel */
 .panel-heading {
   display: flex;
   align-items: flex-start;
@@ -286,6 +328,7 @@
   letter-spacing: 0;
 }
 
+/* Gráficos SVG */
 .chart {
   width: 100%;
   height: auto;
@@ -297,6 +340,7 @@
   stroke-width: 2;
 }
 
+/* Lista de datos clave-valor */
 .stats-list {
   display: grid;
   gap: 12px;
@@ -322,6 +366,7 @@
   font-weight: 900;
 }
 
+/* Lista de alertas */
 .alert-list {
   display: grid;
   gap: 10px;
@@ -349,6 +394,7 @@
   color: #7d6767;
 }
 
+/* Envoltorio con scroll horizontal para tablas anchas en móvil */
 .table-wrap {
   overflow-x: auto;
 }
@@ -377,6 +423,11 @@ td {
   color: #263b38;
 }
 
+/* ==========================================================================
+   DISEÑO RESPONSIVO (MEDIA QUERIES)
+   ========================================================================== */
+
+/* Tablets / laptops pequeñas: las rejillas pasan a 2 columnas */
 @media (max-width: 1100px) {
   .metric-grid,
   .dashboard-grid {
@@ -388,6 +439,7 @@ td {
   }
 }
 
+/* Celulares: todo en una sola columna */
 @media (max-width: 720px) {
   .dashboard-header {
     display: grid;
@@ -411,12 +463,15 @@ td {
     grid-column: auto;
   }
 }
-/* ═══ SENSORES ═══ */
+
+/* ═══ SENSORES EN TIEMPO REAL ═══ */
 .sensors-section { margin: 2rem 0; }
 .section-title { font-size: 1.3rem; font-weight: 700; margin-bottom: 1rem; color: #1a1a2e; }
+/* Rejilla que ajusta sola cuántas tarjetas caben por fila */
 .sensors-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; }
 
 .sensor-card { background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); overflow: hidden; }
+/* Barra de color lateral que identifica el sensor */
 .sensor-card-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.2rem; border-left: 4px solid; }
 .sensor-card-header h3 { font-size: 1rem; font-weight: 700; margin: 0; color: #1a1a2e; }
 .sensor-caudal { text-align: right; }
@@ -432,19 +487,21 @@ td {
 .balance-title { font-size: 1.3rem; font-weight: 700; color: #1a1a2e; margin: 0 0 0.3rem; }
 .balance-desc { font-size: 0.9rem; color: #666; margin: 0 0 1.5rem; }
 
+/* Fila con la fórmula del balance (cajas + símbolos) */
 .balance-formula { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
 .balance-box { background: #f0f4f8; border-radius: 10px; padding: 1rem 1.2rem; text-align: center; min-width: 110px; }
-.balance-box.entrada { background: #e0f0ff; border: 2px solid #0077b6; }
-.balance-box.salida { background: #e0f7f4; border: 2px solid #2a9d8f; }
-.balance-box.fuga { background: #fff0e0; border: 2px solid #e76f51; }
+.balance-box.entrada { background: #e0f0ff; border: 2px solid #0077b6; }  /* agua que entra */
+.balance-box.salida { background: #e0f7f4; border: 2px solid #2a9d8f; }   /* agua que sale */
+.balance-box.fuga { background: #fff0e0; border: 2px solid #e76f51; }     /* pérdida */
 .balance-box .balance-icon { display: block; font-size: 1.5rem; margin-bottom: 0.3rem; }
 .balance-box strong { display: block; font-size: 1.5rem; font-weight: 800; color: #1a1a2e; }
 .balance-box small { font-size: 0.75rem; color: #666; line-height: 1.3; }
 .balance-equals, .balance-plus { font-size: 1.8rem; font-weight: 700; color: #888; }
 
+/* Barra proporcional (cada color = un ramal o la pérdida) */
 .balance-bar-wrap { margin-bottom: 1rem; }
 .balance-bar { height: 28px; background: #eee; border-radius: 14px; overflow: hidden; display: flex; margin-bottom: 0.5rem; }
-.balance-bar-seg { height: 100%; transition: width 0.5s ease; }
+.balance-bar-seg { height: 100%; transition: width 0.5s ease; }   /* animación al cambiar el ancho */
 .balance-bar-seg.ramal1 { background: #0077b6; }
 .balance-bar-seg.ramal2 { background: #2a9d8f; }
 .balance-bar-seg.perdida { background: #e76f51; }
@@ -455,28 +512,33 @@ td {
 .ramal2-dot { background: #2a9d8f; }
 .perdida-dot { background: #e76f51; }
 
+/* Mensaje de estado del balance (ok = verde, fuga = naranja) */
 .balance-status { padding: 0.8rem 1.2rem; border-radius: 8px; font-weight: 600; font-size: 0.95rem; margin-top: 1rem; }
 .balance-status.ok { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
 .balance-status.fuga { background: #fff3e0; color: #e65100; border: 1px solid #ffcc80; }
 
-/* ═══ ELECTROVÁLVULAS ═══ */
+/* ═══ ELECTROVÁLVULAS (ACTUADORES) ═══ */
 .valvulas-section { margin: 2rem 0; }
 .valvulas-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.2rem; }
 .valvula-card { background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); padding: 1.2rem; }
 .valvula-card h3 { font-size: 1rem; font-weight: 700; color: #1a1a2e; margin: 0 0 0.2rem; }
 .valvula-sub { font-size: 0.8rem; color: #888; margin: 0 0 1rem; }
 .valvula-btns { display: flex; gap: 0.8rem; }
+/* Botón abrir = verde */
 .btn-abrir { flex: 1; padding: 0.6rem; border: none; border-radius: 8px; background: #e8f5e9; color: #2e7d32; font-weight: 700; cursor: pointer; font-size: 0.9rem; transition: background 0.2s; }
 .btn-abrir:hover { background: #c8e6c9; }
+/* Botón cerrar = rojo */
 .btn-cerrar { flex: 1; padding: 0.6rem; border: none; border-radius: 8px; background: #ffebee; color: #c62828; font-weight: 700; cursor: pointer; font-size: 0.9rem; transition: background 0.2s; }
 .btn-cerrar:hover { background: #ffcdd2; }
 
 /* ═══ HISTORIAL ═══ */
 .historial-section { margin: 2rem 0; background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); padding: 1.5rem; }
 .user-badge { font-size: 0.85rem; background: #f0f4f8; padding: 0.4rem 0.8rem; border-radius: 20px; color: #444; font-weight: 600; }
+
 /* ═══ ADMINISTRACIÓN DE USUARIOS ═══ */
 .vista-switch { max-width: 320px; }
 .admin-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+/* Botones compactos para las acciones de cada fila */
 .btn-mini {
   border: 1px solid #cddbd8;
   border-radius: 6px;
@@ -493,7 +555,7 @@ td {
 .btn-mini-eliminar { background: #fff0f0; color: #9a2424; border-color: #f0b7b7; }
 .user-badge { color: #314743; font-weight: 700; font-size: 0.9rem; }
 
-/* ═══ ESTADO CONFIRMADO DE ACTUADORES ═══ */
+/* ═══ ESTADO CONFIRMADO DE ACTUADORES (ACK del ESP32) ═══ */
 .actuador-chip {
   display: inline-block;
   border-radius: 999px;
@@ -501,10 +563,12 @@ td {
   font-size: 0.78rem;
   font-weight: 800;
 }
-.actuador-ok { background: #e8f6ef; color: #176046; }
-.actuador-pendiente { background: #fff3e0; color: #b45309; }
+.actuador-ok { background: #e8f6ef; color: #176046; }          /* confirmado por el hardware */
+.actuador-pendiente { background: #fff3e0; color: #b45309; }   /* esperando confirmación */
+
 /* ═══ MAPA DE UBICACIÓN ═══ */
 .mapa-section { margin: 2rem 0; }
+/* Marco donde Leaflet dibuja el mapa */
 .mapa-contenedor {
   width: 100%;
   height: 380px;
@@ -527,6 +591,7 @@ td {
   border-radius: 50%;
   margin-right: 4px;
 }
+
 /* ═══ FILTRO Y PAGINADOR DEL HISTORIAL ═══ */
 .historial-filtros {
   display: flex;
@@ -552,11 +617,13 @@ td {
   background: #fff;
   color: #314743;
 }
+/* Texto "N lecturas" */
 .historial-conteo {
   font-size: 0.8rem;
   color: #7c8d8a;
   font-weight: 600;
 }
+/* Barra de paginación inferior */
 .historial-paginador {
   display: flex;
   align-items: center;
@@ -576,7 +643,7 @@ td {
   cursor: pointer;
 }
 .historial-paginador button:hover:not(:disabled) { background: #edf4f2; }
-.historial-paginador button:disabled { opacity: 0.4; cursor: not-allowed; }
+.historial-paginador button:disabled { opacity: 0.4; cursor: not-allowed; }  /* primera/última página */
 .historial-paginador span {
   font-size: 0.85rem;
   font-weight: 700;

@@ -1,5 +1,18 @@
+// ============================================================================
+//  MapaUbicacion.jsx  —  MAPA GEOGRÁFICO DE LA VEREDA (Leaflet)
+// ----------------------------------------------------------------------------
+//  Dibuja un mapa interactivo con:
+//    · La infraestructura del acueducto (bocatoma y dos ramales), como puntos fijos.
+//    · Los usuarios registrados, ubicados por sus coordenadas, en verde (activo)
+//      o rojo (inactivo).
+//  Al pulsar el marcador de un usuario aparece una ventana emergente (popup)
+//  con una mini-gráfica del caudal en tiempo real del punto que tiene asociado.
+// ============================================================================
+
+// useRef: guarda referencias que sobreviven entre renders sin provocar redibujo
+//         (aquí, el objeto del mapa y las capas de Leaflet).
 import { useEffect, useRef, useState } from 'react'
-import L from 'leaflet'
+import L from 'leaflet'   // librería del mapa
 
 //puntos de ejemplo cerca de bucaramanga (floridablanca), simulando donde
 //quedaria la bocatoma y los 2 ramales de una vereda real
@@ -9,7 +22,7 @@ const PUNTOS = [
     { id: 'ramal2', nombre: 'Ramal 2', lat: 7.0880, lng: -73.1290, color: '#e76f51' },
 ]
 
-const CENTRO = [7.0900, -73.1310]
+const CENTRO = [7.0900, -73.1310]   // punto donde se centra el mapa al abrir
 const VERDE = '#2e7d32'   // usuario activo
 const ROJO = '#c62828'    // usuario inactivo
 
@@ -45,9 +58,12 @@ function crearIconoUsuario(activo) {
 //si el usuario no tiene coordenadas, le damos una posicion ESTABLE (siempre la misma)
 //cerca de la vereda, calculada a partir de su nombre de usuario
 function posicionUsuario(u) {
+    // Si el admin ya le puso lat/lng, usamos esas.
     if (typeof u.latitud === 'number' && typeof u.longitud === 'number') {
         return [u.latitud, u.longitud]
     }
+    // Si no, generamos un "hash" numérico a partir del nombre de usuario. Así el
+    // mismo usuario siempre cae en el mismo lugar (posición estable, no aleatoria).
     let h = 0
     const s = u.usuario || ''
     for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
@@ -56,11 +72,17 @@ function posicionUsuario(u) {
     return [CENTRO[0] + desplazamientoLat, CENTRO[1] + desplazamientoLng]
 }
 
+// ============================================================================
+//  COMPONENTE PRINCIPAL DEL MAPA
+//  Recibe el cliente 'api', las 'cabeceras' de autorización y las 'lecturas'
+//  actuales de los sensores (para las mini-gráficas de los popups).
+// ============================================================================
 export default function MapaUbicacion({ api, cabeceras, lecturas = [] }) {
-    const contenedorRef = useRef(null)
-    const mapaRef = useRef(null)
-    const capaUsuariosRef = useRef(null)
-    const capaInfraRef = useRef(null)
+    // Referencias a elementos que NO deben provocar redibujo al cambiar.
+    const contenedorRef = useRef(null)   // el <div> donde vive el mapa
+    const mapaRef = useRef(null)         // el objeto mapa de Leaflet
+    const capaUsuariosRef = useRef(null) // capa que agrupa los marcadores de usuarios
+    const capaInfraRef = useRef(null)    // capa de la infraestructura
     const [mapaListo, setMapaListo] = useState(false)
     const [usuarios, setUsuarios] = useState([])
     const [filtroMapa, setFiltroMapa] = useState('todos') // todos | activos | inactivos
@@ -82,6 +104,7 @@ export default function MapaUbicacion({ api, cabeceras, lecturas = [] }) {
         const nombre = nombreForzado || (info ? info.nombre : 'Sin punto')
         const color = info ? info.color : '#888'
         let serie = []
+        // Tomamos las últimas 20 lecturas de ese sensor y las invertimos (viejo->nuevo).
         if (sensorId && INFO_SENSOR[sensorId]) {
             serie = lecturas
                 .filter(r => r.sensor_id === sensorId)
@@ -92,6 +115,7 @@ export default function MapaUbicacion({ api, cabeceras, lecturas = [] }) {
         let planaCero = false
         if (serie.length < 2) { serie = [0, 0]; planaCero = true }
 
+        // Escalado de la serie a las dimensiones del mini-lienzo SVG.
         const w = 200, h = 60, pad = 6
         const max = Math.max(...serie, 1), min = Math.min(...serie, 0)
         const rango = (max - min) || 1
@@ -101,6 +125,7 @@ export default function MapaUbicacion({ api, cabeceras, lecturas = [] }) {
             return `${x.toFixed(1)},${y.toFixed(1)}`
         }).join(' ')
         const actual = (planaCero ? 0 : serie[serie.length - 1]).toFixed(1)
+        // Devuelve HTML como texto (Leaflet lo inserta dentro del popup).
         return `<div style="margin-top:6px">
             <strong style="color:${color}">${nombre}</strong>
             <span style="float:right;font-weight:bold;color:${color}">${actual} mL/min</span>
@@ -112,14 +137,17 @@ export default function MapaUbicacion({ api, cabeceras, lecturas = [] }) {
 
     //Se crea el mapa una sola vez, con la infraestructura (bocatoma y ramales)
     useEffect(() => {
+        // Si el mapa ya existe o el contenedor aún no está listo, no hacemos nada.
         if (mapaRef.current || !contenedorRef.current) return
 
+        // Crea el mapa centrado en la vereda, con zoom 15 y sin zoom por rueda.
         const mapa = L.map(contenedorRef.current, {
             center: CENTRO,
             zoom: 15,
             scrollWheelZoom: false,
         })
 
+        // Capa base de OpenStreetMap (el "fondo" del mapa).
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors',
             maxZoom: 19,
@@ -132,6 +160,7 @@ export default function MapaUbicacion({ api, cabeceras, lecturas = [] }) {
         mapaRef.current = mapa
         setMapaListo(true)
 
+        // Limpieza: al desmontar el componente destruimos el mapa para liberar memoria.
         return () => {
             mapa.remove()
             mapaRef.current = null
@@ -162,9 +191,11 @@ export default function MapaUbicacion({ api, cabeceras, lecturas = [] }) {
 
         //--- usuarios ---
         const capa = capaUsuariosRef.current
-        capa.clearLayers()
+        capa.clearLayers()   // borra los marcadores anteriores antes de repintar
+        // Aplica el filtro seleccionado (todos / activos / inactivos).
         const visibles = usuarios.filter((u) =>
             filtroMapa === 'activos' ? u.esta_activo : filtroMapa === 'inactivos' ? !u.esta_activo : true)
+        // Dibuja un marcador por usuario con su popup (nombre, estado y mini-gráfica).
         visibles.forEach((u) => {
             const [lat, lng] = posicionUsuario(u)
             const nombre = (u.nombre || u.usuario || 'Usuario').trim()
@@ -176,6 +207,7 @@ export default function MapaUbicacion({ api, cabeceras, lecturas = [] }) {
         })
     }, [usuarios, mapaListo, lecturas, filtroMapa])
 
+    // Conteos para la leyenda y los botones de filtro.
     const activos = usuarios.filter((u) => u.esta_activo).length
     const inactivos = usuarios.length - activos
 
@@ -186,13 +218,16 @@ export default function MapaUbicacion({ api, cabeceras, lecturas = [] }) {
                     <p className="eyebrow">Ubicación</p>
                     <h2>Mapa del sistema — Vereda (simulado)</h2>
                 </div>
+                {/* Botones de filtro del mapa */}
                 <div style={{ display: 'flex', gap: 6 }}>
                     <button className="btn-mini" type="button" onClick={() => setFiltroMapa('todos')} style={filtroMapa === 'todos' ? { background: '#176b87', color: '#fff', borderColor: '#176b87' } : {}}>Todos ({usuarios.length})</button>
                     <button className="btn-mini" type="button" onClick={() => setFiltroMapa('activos')} style={filtroMapa === 'activos' ? { background: '#2e7d32', color: '#fff', borderColor: '#2e7d32' } : {}}>🟢 Activos ({activos})</button>
                     <button className="btn-mini" type="button" onClick={() => setFiltroMapa('inactivos')} style={filtroMapa === 'inactivos' ? { background: '#c62828', color: '#fff', borderColor: '#c62828' } : {}}>🔴 Inactivos ({inactivos})</button>
                 </div>
             </div>
+            {/* Aquí Leaflet dibuja el mapa (referenciado por contenedorRef) */}
             <div className="mapa-contenedor" ref={contenedorRef} />
+            {/* Leyenda de colores */}
             <div className="mapa-leyenda">
                 <span><span className="dot" style={{ background: VERDE }} /> Usuario activo ({activos})</span>
                 <span><span className="dot" style={{ background: ROJO }} /> Usuario inactivo ({inactivos})</span>

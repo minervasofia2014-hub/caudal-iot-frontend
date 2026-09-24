@@ -1,41 +1,51 @@
+/* ==========================================================================
+   ESTILOS GENERALES Y LOGIN / AUTENTICACIÓN
+   ========================================================================== */
+
+/* Contenedor principal de la pantalla de login/registro */
 .auth-page {
   display: grid;
-  min-height: 100svh;
-  box-sizing: border-box;
-  place-items: center;
+  min-height: 100svh; /* svh soporta mejor las barras dinámicas en móviles */
+  box-sizing: border-box; /* asegura que el padding no desborde la pantalla */
+  place-items: center; /* centra vertical y horizontalmente la tarjeta */
   padding: 24px;
   color: #172321;
+  /* Fondo compuesto con dos gradientes suaves sobre un tono base */
   background:
     linear-gradient(135deg, rgba(23, 107, 135, 0.1), transparent 34%),
     linear-gradient(315deg, rgba(172, 138, 65, 0.14), transparent 38%),
     #f5f8f7;
 }
 
+/* Tarjeta / contenedor flotante del formulario de login */
 .auth-panel {
-  width: min(100%, 420px);
+  width: min(100%, 420px); /* responsive: llena el 100% pero tope en 420px */
   box-sizing: border-box;
   border: 1px solid #dce7e4;
   border-radius: 8px;
   padding: 28px;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 16px 36px rgba(24, 43, 40, 0.08);
+  background: rgba(255, 255, 255, 0.94); /* leve transparencia sobre el fondo */
+  box-shadow: 0 16px 36px rgba(24, 43, 40, 0.08); /* sombra suave para dar elevación */
 }
 
+/* Título de bienvenida en el panel de acceso */
 .auth-panel h1 {
-  margin: 0;
+  margin: 0; /* elimina el margin default del h1 */
   font-size: 2rem;
   line-height: 1.1;
   letter-spacing: 0;
 }
 
+/* Subtítulo o texto explicativo del login */
 .auth-panel p {
   margin: 10px 0 0;
-  color: #526663;
+  color: #526663; /* gris secundario para menor contraste */
 }
 
+/* Selector de pestañas para cambiar entre Login y Registro */
 .auth-switch {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr)); /* dos columnas iguales */
   gap: 6px;
   margin-top: 22px;
   border: 1px solid #dce7e4;
@@ -44,39 +54,44 @@
   background: #edf4f2;
 }
 
+/* Botones dentro del switch de autenticación */
 .auth-switch button {
   min-height: 38px;
   border: 0;
   border-radius: 6px;
   color: #314743;
-  background: transparent;
-  font: inherit;
+  background: transparent; /* inactivo por defecto */
+  font: inherit; /* mantiene la fuente global del proyecto */
   font-weight: 900;
   cursor: pointer;
 }
 
+/* Pestaña seleccionada actualmente */
 .auth-switch button.active {
   color: #fff;
-  background: #176b87;
+  background: #176b87; /* azul principal de la marca */
 }
 
+/* Estructura del formulario de entrada */
 .login-form {
   display: grid;
-  gap: 14px;
+  gap: 14px; /* espacio uniforme entre inputs */
   margin-top: 24px;
 }
 
+/* Etiquetas que envuelven los inputs */
 .login-form label {
   display: grid;
-  gap: 8px;
+  gap: 8px; /* espacio entre el texto del label y el input */
   color: #314743;
   font-weight: 800;
 }
 
+/* Campos de texto e inputs de la autenticación */
 .login-form input {
   box-sizing: border-box;
   width: 100%;
-  min-height: 44px;
+  min-height: 44px; /* altura accesible para pantallas táctiles */
   border: 1px solid #cddbd8;
   border-radius: 6px;
   padding: 0 12px;
@@ -85,17 +100,20 @@
   font: inherit;
 }
 
+/* Efecto focus al interactuar con el teclado o mouse */
 .login-form input:focus {
   border-color: #176b87;
-  outline: 3px solid rgba(23, 107, 135, 0.16);
+  outline: 3px solid rgba(23, 107, 135, 0.16); /* aro azul de selección accesible */
 }
 
+/* Agrupador para inputs que van en la misma fila (ej: Nombre y Apellido) */
 .form-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
+/* Estilos de botones de envío y de cierre de sesión */
 .login-form button,
 .logout-button {
   min-height: 40px;
@@ -109,11 +127,13 @@
   cursor: pointer;
 }
 
+/* Estado deshabilitado mientras se procesa la petición */
 .login-form button:disabled {
   cursor: wait;
-  opacity: 0.7;
+  opacity: 0.7; /* retroalimentación visual de carga */
 }
 
+/* Mensaje flotante cuando una acción es exitosa */
 .success-banner {
   margin-bottom: 4px;
   border: 1px solid #a9d8bf;
@@ -124,10 +144,15 @@
   font-weight: 700;
 }
 
+/* ==========================================================================
+   DASHBOARD / PANEL PRINCIPAL
+   ========================================================================== */
+
+/* Layout general de la vista del dashboard */
 .dashboard-page {
   min-height: 100svh;
   box-sizing: border-box;
-  padding: 28px clamp(16px, 4vw, 48px);
+  padding: 28px clamp(16px, 4vw, 48px); /* padding fluido para adaptarse al ancho */
   color: #172321;
   background:
     linear-gradient(135deg, rgba(23, 107, 135, 0.08), transparent 32%),
@@ -135,6 +160,7 @@
     #f5f8f7;
 }
 
+/* Cabecera del panel con título y acciones globales */
 .dashboard-header {
   display: flex;
   align-items: flex-start;
@@ -143,6 +169,7 @@
   margin-bottom: 24px;
 }
 
+/* Título grande del panel con escalado tipográfico fluido */
 .dashboard-header h1 {
   margin: 0;
   font-size: clamp(2rem, 4vw, 3.5rem);
@@ -150,22 +177,26 @@
   letter-spacing: 0;
 }
 
+/* Descripción secundaria debajo del título principal */
 .dashboard-header p {
   max-width: 720px;
   margin: 10px 0 0;
   color: #526663;
 }
 
+/* Contenedor para botones del área superior derecha */
 .header-actions {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
+/* Sobrescritura de color para diferenciar el botón de salir */
 .logout-button {
   background: #314743;
 }
 
+/* Texto pequeño en mayúsculas tipo etiqueta/categoría */
 .eyebrow {
   margin: 0 0 8px;
   color: #176b87;
@@ -175,6 +206,7 @@
   text-transform: uppercase;
 }
 
+/* Badges / Cápsulas de estado */
 .status-pill,
 .table-status {
   display: inline-flex;
@@ -185,21 +217,24 @@
   padding: 0 12px;
   font-size: 0.9rem;
   font-weight: 800;
-  white-space: nowrap;
+  white-space: nowrap; /* evita que el texto se rompa en dos líneas */
 }
 
+/* Indicador circular de color dentro de los badges */
 .status-pill span {
   width: 10px;
   height: 10px;
   border-radius: 999px;
-  background: currentColor;
+  background: currentColor; /* hereda el color de texto definido en el estado */
 }
 
+/* Estado verde / OK */
 .status-normal {
   color: #176046;
   background: #e8f6ef;
 }
 
+/* Estados críticos agrupados con tono rojo de alerta */
 .status-seco,
 .status-exceso,
 .status-error,
@@ -208,6 +243,7 @@
   background: #fff0f0;
 }
 
+/* Banner destacado para alertas críticas en pantalla */
 .alert-banner {
   margin-bottom: 18px;
   border: 1px solid #f0b7b7;
@@ -218,22 +254,26 @@
   font-weight: 700;
 }
 
+/* Disposición en grilla del dashboard */
 .metric-grid,
 .dashboard-grid {
   display: grid;
   gap: 16px;
 }
 
+/* Fila de tarjetas de métricas en 4 columnas */
 .metric-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   margin-bottom: 16px;
 }
 
+/* Distribución principal: columna central más ancha que la lateral */
 .dashboard-grid {
   grid-template-columns: 1.4fr 0.8fr;
   align-items: start;
 }
 
+/* Tarjetas métricas y paneles de contenido */
 .stat-card,
 .panel {
   border: 1px solid #dce7e4;
@@ -242,6 +282,7 @@
   box-shadow: 0 16px 36px rgba(24, 43, 40, 0.08);
 }
 
+/* Tarjeta individual de métrica/KPI */
 .stat-card {
   display: grid;
   gap: 8px;
@@ -250,6 +291,7 @@
   padding: 18px;
 }
 
+/* Textos secundarios de las métricas */
 .stat-card span,
 .stat-card small,
 .panel-heading small,
@@ -257,19 +299,23 @@
   color: #5d6f6c;
 }
 
+/* Valor numérico principal resaltado */
 .stat-card strong {
   font-size: clamp(1.35rem, 2.5vw, 2rem);
   line-height: 1.1;
 }
 
+/* Contenedor genérico de sección o módulo */
 .panel {
   padding: 18px;
 }
 
+/* Clase de soporte para paneles que deben expandirse */
 .panel-wide {
   grid-column: span 1;
 }
 
+/* Encabezado interno de los paneles */
 .panel-heading {
   display: flex;
   align-items: flex-start;
@@ -285,23 +331,27 @@
   letter-spacing: 0;
 }
 
+/* Ajustes visuales para gráficos SVG renderizados */
 .chart {
   width: 100%;
   height: auto;
   display: block;
 }
 
+/* Líneas de guía en gráficos */
 .chart line {
   stroke: #d9e4e1;
   stroke-width: 2;
 }
 
+/* Lista tipo Definition List para resumen de datos */
 .stats-list {
   display: grid;
   gap: 12px;
   margin: 0;
 }
 
+/* Filas con separador inferior suave */
 .stats-list div {
   display: flex;
   align-items: center;
@@ -311,16 +361,19 @@
   padding-bottom: 10px;
 }
 
+/* Término/Clave de la métrica */
 .stats-list dt {
   color: #627471;
   font-weight: 700;
 }
 
+/* Valor de la métrica */
 .stats-list dd {
   margin: 0;
   font-weight: 900;
 }
 
+/* Lista vertical de eventos o alertas */
 .alert-list {
   display: grid;
   gap: 10px;
@@ -331,6 +384,7 @@
   color: #5d6f6c;
 }
 
+/* Item individual de alerta con borde izquierdo acentuado */
 .alert-item {
   display: grid;
   gap: 3px;
@@ -348,14 +402,16 @@
   color: #7d6767;
 }
 
+/* Envoltorio con scroll horizontal para tablas en pantallas chicas */
 .table-wrap {
   overflow-x: auto;
 }
 
+/* Estilos generales de tabla de datos */
 table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 720px;
+  min-width: 720px; /* garantiza legibilidad forzando scroll en pantallas reducidas */
 }
 
 th,
@@ -366,28 +422,39 @@ td {
   vertical-align: middle;
 }
 
+/* Encabezados de tabla */
 th {
   color: #566a67;
   font-size: 0.83rem;
   text-transform: uppercase;
 }
 
+/* Celdas de datos */
 td {
   color: #263b38;
 }
 
+/* ==========================================================================
+   DISEÑO RESPONSIVO (MEDIA QUERIES)
+   ========================================================================== */
+
+/* Pantallas medianas (laptops pequeñas / tablets horizontal) */
 @media (max-width: 1100px) {
+  /* Reorganiza las grillas de 4 a 2 columnas */
   .metric-grid,
   .dashboard-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  /* Los paneles anchos ocupan todo el ancho disponible */
   .panel-wide {
     grid-column: 1 / -1;
   }
 }
 
+/* Pantallas pequeñas (smartphones / tablets vertical) */
 @media (max-width: 720px) {
+  /* Pasa el header a disposición apilada */
   .dashboard-header {
     display: grid;
   }
@@ -397,10 +464,12 @@ td {
     flex-wrap: wrap;
   }
 
+  /* Formularios pasan a una sola columna */
   .form-row {
     grid-template-columns: 1fr;
   }
 
+  /* Grillas pasan a 1 sola columna */
   .metric-grid,
   .dashboard-grid {
     grid-template-columns: 1fr;
@@ -410,72 +479,125 @@ td {
     grid-column: auto;
   }
 }
-/* ═══ SENSORES ═══ */
+
+/* ==========================================================================
+   SECCIÓN DE SENSORES EN TIEMPO REAL
+   ========================================================================== */
+
 .sensors-section { margin: 2rem 0; }
 .section-title { font-size: 1.3rem; font-weight: 700; margin-bottom: 1rem; color: #1a1a2e; }
+
+/* Grid dinámico que ajusta automáticamente la cantidad de tarjetas por fila */
 .sensors-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; }
 
+/* Tarjeta individual del sensor */
 .sensor-card { background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); overflow: hidden; }
+
+/* Cabecera del sensor con indicador lateral de estado por borde */
 .sensor-card-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.2rem; border-left: 4px solid; }
 .sensor-card-header h3 { font-size: 1rem; font-weight: 700; margin: 0; color: #1a1a2e; }
+
+/* Bloque para la lectura de caudal de agua */
 .sensor-caudal { text-align: right; }
 .sensor-caudal strong { display: block; font-size: 1.8rem; font-weight: 800; line-height: 1; }
 .sensor-caudal small { font-size: 0.75rem; color: #888; }
+
+/* Pie de tarjeta con metadatos (ej: hora de actualización) */
 .sensor-card-footer { display: flex; justify-content: space-between; padding: 0.7rem 1.2rem; background: #f8f9fa; font-size: 0.82rem; color: #555; }
+
+/* Área para micrográficas mini (sparklines) */
 .sparkline-wrap { padding: 0.5rem 1rem; }
 .sparkline-label { font-size: 0.8rem; color: #888; margin-bottom: 0.3rem; }
 
-/* ═══ BALANCE HÍDRICO ═══ */
+/* ==========================================================================
+   MÓDULO DE BALANCE HÍDRICO (ENTRADAS VS SALIDAS)
+   ========================================================================== */
+
 .balance-wrap { margin: 2rem 0; }
 .balance-section { background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); padding: 2rem; }
 .balance-title { font-size: 1.3rem; font-weight: 700; color: #1a1a2e; margin: 0 0 0.3rem; }
 .balance-desc { font-size: 0.9rem; color: #666; margin: 0 0 1.5rem; }
 
+/* Contenedor flexible para representar la fórmula matemática */
 .balance-formula { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+
+/* Cajas contenedoras de cada término del balance */
 .balance-box { background: #f0f4f8; border-radius: 10px; padding: 1rem 1.2rem; text-align: center; min-width: 110px; }
-.balance-box.entrada { background: #e0f0ff; border: 2px solid #0077b6; }
-.balance-box.salida { background: #e0f7f4; border: 2px solid #2a9d8f; }
-.balance-box.fuga { background: #fff0e0; border: 2px solid #e76f51; }
+
+/* Tipos de caja diferenciados por borde y fondo */
+.balance-box.entrada { background: #e0f0ff; border: 2px solid #0077b6; } /* Entrada principal */
+.balance-box.salida { background: #e0f7f4; border: 2px solid #2a9d8f; }  /* Salida/Consumo */
+.balance-box.fuga { background: #fff0e0; border: 2px solid #e76f51; }    /* Pérdidas / Fugas */
+
 .balance-box .balance-icon { display: block; font-size: 1.5rem; margin-bottom: 0.3rem; }
 .balance-box strong { display: block; font-size: 1.5rem; font-weight: 800; color: #1a1a2e; }
 .balance-box small { font-size: 0.75rem; color: #666; line-height: 1.3; }
+
+/* Símbolos (= y +) que unen las cajas */
 .balance-equals, .balance-plus { font-size: 1.8rem; font-weight: 700; color: #888; }
 
+/* Barra visual de distribución del agua */
 .balance-bar-wrap { margin-bottom: 1rem; }
 .balance-bar { height: 28px; background: #eee; border-radius: 14px; overflow: hidden; display: flex; margin-bottom: 0.5rem; }
+
+/* Segmentos de la barra proporcional con animación smooth */
 .balance-bar-seg { height: 100%; transition: width 0.5s ease; }
 .balance-bar-seg.ramal1 { background: #0077b6; }
 .balance-bar-seg.ramal2 { background: #2a9d8f; }
 .balance-bar-seg.perdida { background: #e76f51; }
 
+/* Leyenda explicativa de la barra */
 .balance-bar-legend { display: flex; gap: 1.5rem; font-size: 0.82rem; color: #555; }
 .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; }
 .ramal1-dot { background: #0077b6; }
 .ramal2-dot { background: #2a9d8f; }
 .perdida-dot { background: #e76f51; }
 
+/* Mensaje final del estado del balance */
 .balance-status { padding: 0.8rem 1.2rem; border-radius: 8px; font-weight: 600; font-size: 0.95rem; margin-top: 1rem; }
 .balance-status.ok { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
 .balance-status.fuga { background: #fff3e0; color: #e65100; border: 1px solid #ffcc80; }
 
-/* ═══ ELECTROVÁLVULAS ═══ */
+/* ==========================================================================
+   CONTROLES DE ELECTROVÁLVULAS (ACTUADORES)
+   ========================================================================== */
+
 .valvulas-section { margin: 2rem 0; }
 .valvulas-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.2rem; }
+
+/* Tarjeta individual para controlar una válvula */
 .valvula-card { background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); padding: 1.2rem; }
 .valvula-card h3 { font-size: 1rem; font-weight: 700; color: #1a1a2e; margin: 0 0 0.2rem; }
 .valvula-sub { font-size: 0.8rem; color: #888; margin: 0 0 1rem; }
+
+/* Botones de acción manual */
 .valvula-btns { display: flex; gap: 0.8rem; }
+
+/* Botón Abrir Válvula (Verde) */
 .btn-abrir { flex: 1; padding: 0.6rem; border: none; border-radius: 8px; background: #e8f5e9; color: #2e7d32; font-weight: 700; cursor: pointer; font-size: 0.9rem; transition: background 0.2s; }
 .btn-abrir:hover { background: #c8e6c9; }
+
+/* Botón Cerrar Válvula (Rojo) */
 .btn-cerrar { flex: 1; padding: 0.6rem; border: none; border-radius: 8px; background: #ffebee; color: #c62828; font-weight: 700; cursor: pointer; font-size: 0.9rem; transition: background 0.2s; }
 .btn-cerrar:hover { background: #ffcdd2; }
 
-/* ═══ HISTORIAL ═══ */
+/* ==========================================================================
+   SECCIÓN HISTORIAL Y AUDITORÍA
+   ========================================================================== */
+
 .historial-section { margin: 2rem 0; background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); padding: 1.5rem; }
+
+/* Badge identificador del usuario conectado o responsable del registro */
 .user-badge { font-size: 0.85rem; background: #f0f4f8; padding: 0.4rem 0.8rem; border-radius: 20px; color: #444; font-weight: 600; }
-/* ═══ ADMINISTRACIÓN DE USUARIOS ═══ */
+
+/* ==========================================================================
+   ADMINISTRACIÓN DE USUARIOS
+   ========================================================================== */
+
 .vista-switch { max-width: 320px; }
 .admin-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+/* Botones compactos para acciones dentro de filas de tabla */
 .btn-mini {
   border: 1px solid #cddbd8;
   border-radius: 6px;
@@ -488,11 +610,17 @@ td {
 }
 .btn-mini:hover { background: #edf4f2; }
 .btn-mini:disabled { opacity: 0.6; cursor: wait; }
+
+/* Variaciones de color para acciones rápidas en usuarios */
 .btn-mini-aprobar { background: #e8f6ef; color: #176046; border-color: #a9d8bf; }
 .btn-mini-eliminar { background: #fff0f0; color: #9a2424; border-color: #f0b7b7; }
 .user-badge { color: #314743; font-weight: 700; font-size: 0.9rem; }
 
-/* ═══ ESTADO CONFIRMADO DE ACTUADORES ═══ */
+/* ==========================================================================
+   ESTADO DE CONFIRMACIÓN DE ACTUADORES (ACK)
+   ========================================================================== */
+
+/* Pastillas que muestran si un comando enviado llegó físicamente al hardware */
 .actuador-chip {
   display: inline-block;
   border-radius: 999px;
@@ -500,10 +628,16 @@ td {
   font-size: 0.78rem;
   font-weight: 800;
 }
-.actuador-ok { background: #e8f6ef; color: #176046; }
-.actuador-pendiente { background: #fff3e0; color: #b45309; }
-/* ═══ MAPA DE UBICACIÓN ═══ */
+.actuador-ok { background: #e8f6ef; color: #176046; }          /* Confirmado por el microcontrolador */
+.actuador-pendiente { background: #fff3e0; color: #b45309; }   /* Comando enviado, esperando ACK */
+
+/* ==========================================================================
+   COMPONENTE DE MAPA GPS / GEOLOCALIZACIÓN
+   ========================================================================== */
+
 .mapa-section { margin: 2rem 0; }
+
+/* Marco donde se renderiza Leaflet / Google Maps */
 .mapa-contenedor {
   width: 100%;
   height: 380px;
@@ -511,6 +645,8 @@ td {
   overflow: hidden;
   border: 1px solid #dce7e4;
 }
+
+/* Leyenda de colores del mapa de nodos */
 .mapa-leyenda {
   display: flex;
   gap: 1.5rem;
@@ -526,7 +662,12 @@ td {
   border-radius: 50%;
   margin-right: 4px;
 }
-/* ═══ FILTRO Y PAGINADOR DEL HISTORIAL ═══ */
+
+/* ==========================================================================
+   FILTROS Y PAGINACIÓN DEL HISTORIAL DE EVENTOS
+   ========================================================================== */
+
+/* Barra de herramientas para filtrar datos del historial */
 .historial-filtros {
   display: flex;
   align-items: center;
@@ -535,6 +676,8 @@ td {
   gap: 12px;
   margin: 4px 0 14px;
 }
+
+/* Etiquetas del filtro */
 .historial-filtros label {
   display: flex;
   align-items: center;
@@ -543,6 +686,8 @@ td {
   font-weight: 700;
   color: #314743;
 }
+
+/* Selectores desplegables del filtro */
 .historial-filtros select {
   border: 1px solid #cddbd8;
   border-radius: 6px;
@@ -551,11 +696,15 @@ td {
   background: #fff;
   color: #314743;
 }
+
+/* Texto indicador de cantidad de registros mostrados (ej: "Mostrando 1-10 de 50") */
 .historial-conteo {
   font-size: 0.8rem;
   color: #7c8d8a;
   font-weight: 600;
 }
+
+/* Contenedor de la barra de paginación inferiores */
 .historial-paginador {
   display: flex;
   align-items: center;
@@ -564,6 +713,8 @@ td {
   margin-top: 16px;
   flex-wrap: wrap;
 }
+
+/* Botones de navegación "Anterior" y "Siguiente" */
 .historial-paginador button {
   border: 1px solid #cddbd8;
   border-radius: 6px;
@@ -574,8 +725,11 @@ td {
   color: #314743;
   cursor: pointer;
 }
+
 .historial-paginador button:hover:not(:disabled) { background: #edf4f2; }
-.historial-paginador button:disabled { opacity: 0.4; cursor: not-allowed; }
+.historial-paginador button:disabled { opacity: 0.4; cursor: not-allowed; } /* Estado cuando se está en la primera/última página */
+
+/* Indicador numérico de página actual */
 .historial-paginador span {
   font-size: 0.85rem;
   font-weight: 700;
